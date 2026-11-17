@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 export default function App() {
-  const [userName, setUserName] = useState('鄭宇軒Peter'); 
+  const [userName, setUserName] = useState(''); // 預設留空，完全依賴 LINE 登入抓取
   const [serviceItem, setServiceItem] = useState('質感剪髮');
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
@@ -12,7 +12,7 @@ export default function App() {
   // 自動透過 LINE LIFF 抓取登入的使用者名稱
   useEffect(() => {
     if (window.liff) {
-      window.liff.init({ liffId: "你的LIFF_ID" })
+      window.liff.init({ liffId: "2012650134-fNn1I0l8" })
         .then(() => {
           if (window.liff.isLoggedIn()) {
             window.liff.getProfile().then(profile => {
@@ -29,6 +29,10 @@ export default function App() {
   // 點擊送出時，串接 Google Apps Script 發送 LINE 預約推播通知
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!userName) {
+      alert('正在讀取您的 LINE 帳號，請稍候再試...');
+      return;
+    }
     if (!appointmentDate || !appointmentTime) {
       alert('請完整選擇預約日期與時間');
       return;
@@ -67,7 +71,9 @@ export default function App() {
 
         {/* 歡迎回來橫幅 */}
         <div style={{ backgroundColor: '#f5f2eb', padding: '12px 16px', borderRadius: '10px', marginBottom: '24px', display: 'inline-block', width: '100%', boxSizing: 'border-box' }}>
-          <span style={{ fontSize: '14px', color: '#4a453e', fontWeight: '500' }}>歡迎回來，{userName} 貴賓！</span>
+          <span style={{ fontSize: '14px', color: '#4a453e', fontWeight: '500' }}>
+            {userName ? `歡迎回來，${userName} 貴賓！` : '正在讀取您的 LINE 身分...'}
+          </span>
         </div>
 
         {submitted ? (
@@ -126,27 +132,27 @@ export default function App() {
                 style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', backgroundColor: '#fff', boxSizing: 'border-box' }}
               >
                 <option value="">請選擇時段</option>
-                <option value="10:00">10:00 AM</option>
-                <option value="10:30">10:30 AM</option>
-                <option value="11:00">11:00 AM</option>
-                <option value="11:30">11:30 AM</option>
-                <option value="12:00">12:00 PM</option>
-                <option value="12:30">12:30 PM</option>
-                <option value="13:00">01:00 PM</option>
-                <option value="13:30">01:30 PM</option>
-                <option value="14:00">02:00 PM</option>
-                <option value="14:30">02:30 PM</option>
-                <option value="15:00">03:00 PM</option>
-                <option value="15:30">03:30 PM</option>
-                <option value="16:00">04:00 PM</option>
-                <option value="16:30">04:30 PM</option>
-                <option value="17:00">05:00 PM</option>
-                <option value="17:30">05:30 PM</option>
-                <option value="18:00">06:00 PM</option>
-                <option value="18:30">06:30 PM</option>
-                <option value="19:00">07:00 PM</option>
-                <option value="19:30">07:30 PM</option>
-                <option value="20:00">08:00 PM</option>
+                <option value="10:00 AM">10:00 AM</option>
+                <option value="10:30 AM">10:30 AM</option>
+                <option value="11:00 AM">11:00 AM</option>
+                <option value="11:30 AM">11:30 AM</option>
+                <option value="12:00 PM">12:00 PM</option>
+                <option value="12:30 PM">12:30 PM</option>
+                <option value="01:00 PM">01:00 PM</option>
+                <option value="01:30 PM">01:30 PM</option>
+                <option value="02:00 PM">02:00 PM</option>
+                <option value="02:30 PM">02:30 PM</option>
+                <option value="03:00 PM">03:00 PM</option>
+                <option value="03:30 PM">03:30 PM</option>
+                <option value="04:00 PM">04:00 PM</option>
+                <option value="04:30 PM">04:30 PM</option>
+                <option value="05:00 PM">05:00 PM</option>
+                <option value="05:30 PM">05:30 PM</option>
+                <option value="06:00 PM">06:00 PM</option>
+                <option value="06:30 PM">06:30 PM</option>
+                <option value="07:00 PM">07:00 PM</option>
+                <option value="07:30 PM">07:30 PM</option>
+                <option value="08:00 PM">08:00 PM</option>
               </select>
             </div>
 
@@ -157,20 +163,4 @@ export default function App() {
                 onChange={(e) => setRemark(e.target.value)}
                 placeholder="例如：指定設計師、希望加強頭皮按摩等..."
                 rows="2"
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', boxSizing: 'border-box', resize: 'none' }}
-              />
-            </div>
-
-            <button 
-              type="submit"
-              disabled={isSubmitting}
-              style={{ marginTop: '8px', width: '100%', padding: '14px', backgroundColor: '#2c2c2c', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}
-            >
-              {isSubmitting ? '送出中...' : '確認送出預約'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-}
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '
