@@ -1,10 +1,35 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Calendar, Clock, User, Phone, CheckCircle2, AlertCircle, 
-  Sparkles, ShieldCheck, BellRing, Settings, Scissors, 
-  Plus, Trash2, Edit3, Lock, Unlock, MessageSquare, 
-  ChevronLeft, ChevronRight, LogOut, Check, X, Info
-} from 'lucide-react';
+
+// ==========================================
+// 0. 內建極簡 SVG 圖示庫 (免安裝 lucide-react，雲端直接編譯100%通過)
+// ==========================================
+const Icon = ({ d, className = "w-4 h-4" }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    {Array.isArray(d) ? d.map((path, i) => <path key={i} d={path} />) : <path d={d} />}
+  </svg>
+);
+
+const Calendar = (p) => <Icon {...p} d={["M8 2v4", "M16 2v4", "M3 10h18", "M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"]} />;
+const Clock = (p) => <Icon {...p} d={["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 6v6l4 2"]} />;
+const User = (p) => <Icon {...p} d={["M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2", "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"]} />;
+const Phone = (p) => <Icon {...p} d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />;
+const CheckCircle2 = (p) => <Icon {...p} d={["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "m9 12 2 2 4-4"]} />;
+const AlertCircle = (p) => <Icon {...p} d={["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 8v4", "M12 16h.01"]} />;
+const Sparkles = (p) => <Icon {...p} d={["m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"]} />;
+const ShieldCheck = (p) => <Icon {...p} d={["M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z", "m9 12 2 2 4-4"]} />;
+const BellRing = (p) => <Icon {...p} d={["M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0"]} />;
+const Scissors = (p) => <Icon {...p} d={["M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z", "M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z", "M20 4 8.12 15.88", "M14.47 14.48 20 20", "M8.12 8.12 12 12"]} />;
+const Plus = (p) => <Icon {...p} d={["M5 12h14", "M12 5v14"]} />;
+const Trash2 = (p) => <Icon {...p} d={["M3 6h18", "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6", "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"]} />;
+const Edit3 = (p) => <Icon {...p} d={["M12 20h9", "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"]} />;
+const Lock = (p) => <Icon {...p} d={["M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z", "M7 11V7a5 5 0 0 1 10 0v4"]} />;
+const Unlock = (p) => <Icon {...p} d={["M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z", "M7 11V7a5 5 0 0 1 9.9-1"]} />;
+const MessageSquare = (p) => <Icon {...p} d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />;
+const ChevronLeft = (p) => <Icon {...p} d="m15 18-6-6 6-6" />;
+const ChevronRight = (p) => <Icon {...p} d="m9 18 6-6-6-6" />;
+const LogOut = (p) => <Icon {...p} d={["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "m16 17 5-5-5-5", "M21 12H9"]} />;
+const Check = (p) => <Icon {...p} d="M20 6 9 17l-5-5" />;
+const X = (p) => <Icon {...p} d={["M18 6 6 18", "m6 6 12 12"]} />;
 
 // ==========================================
 // 1. 初始模擬資料庫 (對應 Firestore Schema)
@@ -70,7 +95,6 @@ const INITIAL_APPOINTMENTS = [
 const INITIAL_AVAILABILITY = [
   {
     date: getFutureDateStr(1),
-    // 13:00-14:30 為 apt-1001 已確認鎖定；12:00-13:00 為設計師手動午休鎖定
     blockedSlots: ['12:00', '12:30', '13:00', '13:30', '14:00']
   },
   {
@@ -79,7 +103,6 @@ const INITIAL_AVAILABILITY = [
   }
 ];
 
-// 11:00 至 18:30 為可點擊之起始點（營業至 19:00）
 const ALL_DAILY_SLOTS = [
   '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
   '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
@@ -100,7 +123,6 @@ const minsToTime = (mins) => {
   return `${h}:${m}`;
 };
 
-// 根據起始時間與時長，展開所需佔用的所有 30 分鐘時段陣列
 const expandRequiredSlots = (startTime, durationMinutes) => {
   const slotsCount = Math.ceil(durationMinutes / 30);
   const startMins = timeToMins(startTime);
@@ -112,18 +134,15 @@ const expandRequiredSlots = (startTime, durationMinutes) => {
 };
 
 export default function App() {
-  // --- 模擬資料庫 State ---
   const [services, setServices] = useState(INITIAL_SERVICES);
   const [appointments, setAppointments] = useState(INITIAL_APPOINTMENTS);
   const [availability, setAvailability] = useState(INITIAL_AVAILABILITY);
 
-  // --- 視圖與權限 State ---
-  const [activeView, setActiveView] = useState('customer'); // 'customer' | 'admin'
+  const [activeView, setActiveView] = useState('customer');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPinInput, setAdminPinInput] = useState('');
-  const [adminTab, setAdminTab] = useState('appointments'); // 'appointments' | 'schedule' | 'services'
+  const [adminTab, setAdminTab] = useState('appointments');
 
-  // --- LINE LIFF 模擬 Profile 與訊息紀錄 ---
   const [liffProfile, setLiffProfile] = useState({
     userId: 'U99x8y7z6w5v4u3t2s1r0',
     displayName: '林宥嘉 (LIFF 訪客)',
@@ -132,7 +151,6 @@ export default function App() {
   const [lineLogs, setLineLogs] = useState([]);
   const [toast, setToast] = useState(null);
 
-  // --- 客戶端預約表單 State ---
   const [customerName, setCustomerName] = useState(liffProfile.displayName);
   const [phone, setPhone] = useState('0918-520-319');
   const [selectedServiceId, setSelectedServiceId] = useState(INITIAL_SERVICES[0].id);
@@ -145,12 +163,10 @@ export default function App() {
   const [remark, setRemark] = useState('');
   const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
 
-  // --- 後台排班與服務編輯 State ---
   const [scheduleDate, setScheduleDate] = useState(getFutureDateStr(1));
   const [editingService, setEditingService] = useState(null);
   const [newServiceForm, setNewServiceForm] = useState({ name: '', price: '', duration: 60, desc: '' });
 
-  // 顯示通知 Toast
   const showToast = (title, message, type = 'info') => {
     setToast({ title, message, type, id: Date.now() });
     setTimeout(() => {
@@ -158,9 +174,6 @@ export default function App() {
     }, 4500);
   };
 
-  // ==========================================
-  // 3. LINE LIFF & Messaging API 模擬串接函式
-  // ==========================================
   const initLiff = () => {
     const mockProfile = {
       userId: 'U99x8y7z6w5v4u3t2s1r0',
@@ -208,20 +221,15 @@ export default function App() {
     showToast('LINE 明日提醒已發送', `已向 ${appt.customerName} 發送前一日溫馨提醒`, 'line');
   };
 
-  // ==========================================
-  // 4. 時段可用性與防撞單核心邏輯
-  // ==========================================
   const selectedService = useMemo(
     () => services.find((s) => s.id === selectedServiceId) || services[0],
     [services, selectedServiceId]
   );
 
-  // 取得特定日期的所有不可用時段（合併 Availability.blockedSlots 與已確認訂單的佔用時段）
   const getCombinedBlockedSlotsForDate = (dateStr) => {
     const availDoc = availability.find((a) => a.date === dateStr);
     const manualBlocked = availDoc ? availDoc.blockedSlots : [];
 
-    // 找出該日所有 status === 'confirmed' 的訂單，確保即使未同步寫入 blockedSlots 也能嚴密防護
     const confirmedAppts = appointments.filter(
       (apt) => apt.date === dateStr && apt.status === 'confirmed'
     );
@@ -237,7 +245,6 @@ export default function App() {
     return Array.from(new Set([...manualBlocked, ...apptBlocked]));
   };
 
-  // 判斷單一日期與單一起始時間，是否足夠容納指定時長 (且不跨越 19:00)
   const checkSlotBookable = (dateStr, startTime, durationMinutes) => {
     const startMins = timeToMins(startTime);
     const endMins = startMins + durationMinutes;
@@ -254,12 +261,10 @@ export default function App() {
     return { ok: true, reason: '可預約' };
   };
 
-  // 判斷某日期在 11:00-19:00 之間是否至少還有一個時段可容納當前選擇的服務
   const checkDateHasAnySlot = (dateStr, durationMinutes) => {
     return ALL_DAILY_SLOTS.some((slot) => checkSlotBookable(dateStr, slot, durationMinutes).ok);
   };
 
-  // 產生月曆格子資料
   const calendarDays = useMemo(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -285,12 +290,8 @@ export default function App() {
     return days;
   }, [currentMonth, selectedService, availability, appointments]);
 
-  // 驗證台灣手機格式 (支援 09xx-xxx-xxx 或 09xxxxxxxx)
   const isPhoneValid = /^09\d{2}-?\d{3}-?\d{3}$/.test(phone.trim());
 
-  // ==========================================
-  // 5. 客戶端送出預約處理 (含 Double Booking 檢核)
-  // ==========================================
   const handleCustomerSubmit = (e) => {
     e.preventDefault();
     if (!customerName.trim()) {
@@ -306,7 +307,6 @@ export default function App() {
       return;
     }
 
-    // Double Booking 即時檢核
     const check = checkSlotBookable(selectedDate, selectedTime, selectedService.duration);
     if (!check.ok) {
       showToast('時段已被佔用', `無法預約：${check.reason}，請重新選擇其他時段。`, 'error');
@@ -337,15 +337,10 @@ export default function App() {
     setRemark('');
   };
 
-  // ==========================================
-  // 6. 設計師後台管理操作處理
-  // ==========================================
-  // 確認訂單 -> 將所需時長寫入 Availability.blockedSlots 並發送 LINE 確認通知
   const handleConfirmAppointment = (appt) => {
     const srv = services.find((s) => s.id === appt.serviceId) || { name: '美髮服務', duration: 60, price: 0 };
     const slotsToLock = expandRequiredSlots(appt.time, srv.duration);
 
-    // 確認前再次檢查是否與已鎖定時段衝突
     const currentBlocked = getCombinedBlockedSlotsForDate(appt.date);
     const conflict = slotsToLock.some((s) => currentBlocked.includes(s));
     if (conflict) {
@@ -353,12 +348,10 @@ export default function App() {
       return;
     }
 
-    // 1. 更新訂單狀態為 confirmed
     setAppointments((prev) =>
       prev.map((item) => (item.id === appt.id ? { ...item, status: 'confirmed' } : item))
     );
 
-    // 2. 將時段轉化為 blockedSlots 寫入 Availability
     setAvailability((prev) => {
       const existing = prev.find((a) => a.date === appt.date);
       if (existing) {
@@ -369,7 +362,6 @@ export default function App() {
       }
     });
 
-    // 3. 觸發 LINE Messaging API 發送確認訊息
     sendBookingConfirmedMsg(appt, srv);
   };
 
@@ -380,7 +372,6 @@ export default function App() {
     showToast('訂單狀態已更新', `訂單 #${apptId} 已變更為 ${newStatus}`, 'info');
   };
 
-  // 後台 Tab 2：手動切換單一 30 分鐘時段的「店休/開放」
   const toggleManualBlockSlot = (dateStr, slotStr) => {
     setAvailability((prev) => {
       const existing = prev.find((a) => a.date === dateStr);
@@ -396,7 +387,6 @@ export default function App() {
     });
   };
 
-  // 後台 Tab 2：一鍵設定整日店休或全開
   const toggleWholeDayOff = (dateStr, lockAll) => {
     setAvailability((prev) => {
       const existing = prev.find((a) => a.date === dateStr);
@@ -414,7 +404,6 @@ export default function App() {
     );
   };
 
-  // 後台 Tab 3：新增或儲存服務項目
   const handleSaveService = (e) => {
     e.preventDefault();
     if (!newServiceForm.name.trim() || !newServiceForm.price) return;
@@ -462,12 +451,8 @@ export default function App() {
     showToast('已刪除服務', '該服務項目已從資料庫移除', 'info');
   };
 
-  // ==========================================
-  // 7. 視覺渲染 (極簡胡桃木質調風格)
-  // ==========================================
   return (
     <div className="min-h-screen bg-[#F7F4EF] text-[#2C2520] font-sans selection:bg-[#6E5039] selection:text-white pb-16">
-      {/* 頂部導覽切換列 (方便預覽切換 Client / Admin 與檢視 LINE Webhook 紀錄) */}
       <div className="sticky top-0 z-40 bg-[#2C2520] text-[#EBE5DC] px-4 py-2.5 shadow-md border-b border-[#4A3C31]">
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
@@ -503,7 +488,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* 頂部動態通知 Toast */}
       {toast && (
         <div className="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-[#2C2520] text-[#F7F4EF] border border-[#6E5039] rounded-2xl p-4 shadow-2xl transition-all duration-300">
           <div className="flex items-start gap-3">
@@ -527,26 +511,18 @@ export default function App() {
         </div>
       )}
 
-      {/* =====================================================
-          VIEW 1: 客戶端預約介面 (Customer Booking)
-      ===================================================== */}
       {activeView === 'customer' && (
         <div className="max-w-3xl mx-auto px-4 pt-8">
-          {/* 極簡木質調品牌 Header */}
           <header className="bg-[#EFECE6] border border-[#DFD8CE] rounded-3xl p-8 md:p-10 mb-8 relative overflow-hidden shadow-sm">
             <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
               <div className="text-center md:text-left">
-                {/* 極簡線條品牌 Logo (結合太陽、椰樹、海鷗、波浪髮絲與美髮剪刀意象) */}
                 <div className="inline-flex items-center gap-4 mb-4">
                   <div className="w-16 h-16 rounded-2xl bg-[#2C2520] text-[#EBE5DC] flex items-center justify-center shadow-md border border-[#5A4635]">
                     <svg viewBox="0 0 64 64" className="w-11 h-11 stroke-current fill-none" strokeWidth="1.8">
-                      {/* 太陽與海鷗 */}
                       <circle cx="22" cy="20" r="6" />
                       <path d="M38 16 Q42 12 46 16 Q50 12 54 16" strokeLinecap="round" />
-                      {/* 椰樹與流線髮絲波浪 */}
                       <path d="M12 44 Q28 34 48 44" strokeLinecap="round" />
                       <path d="M10 51 Q30 41 52 51" strokeLinecap="round" />
-                      {/* 隱藏剪刀流線符號 */}
                       <circle cx="46" cy="30" r="3" />
                       <path d="M43 28 L33 22 M43 32 L33 36" strokeLinecap="round" />
                     </svg>
@@ -566,7 +542,6 @@ export default function App() {
                 </p>
               </div>
 
-              {/* LIFF 綁定狀態小卡 */}
               <div className="bg-[#F7F4EF] border border-[#DFD8CE] rounded-2xl p-4 text-xs w-full md:w-60 shrink-0">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-[#5C4E41] flex items-center gap-1.5">
@@ -586,7 +561,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 預約須知 */}
             <div className="mt-6 pt-5 border-t border-[#DFD8CE] grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-[#6E5D4F]">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-[#6E5039] shrink-0" />
@@ -603,9 +577,7 @@ export default function App() {
             </div>
           </header>
 
-          {/* 預約四步驟表單 */}
           <form onSubmit={handleCustomerSubmit} className="space-y-8">
-            {/* STEP 1: 聯絡資訊 */}
             <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-5">
                 <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
@@ -661,7 +633,6 @@ export default function App() {
               </div>
             </section>
 
-            {/* STEP 2: 服務選擇 */}
             <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
@@ -683,7 +654,7 @@ export default function App() {
                       key={srv.id}
                       onClick={() => {
                         setSelectedServiceId(srv.id);
-                        setSelectedTime(''); // 切換服務時重設時間以重新檢核時長
+                        setSelectedTime('');
                       }}
                       className={`cursor-pointer rounded-2xl p-4 border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                         isSelected
@@ -718,7 +689,6 @@ export default function App() {
               </div>
             </section>
 
-            {/* STEP 3: 日期與時間選擇 */}
             <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
@@ -733,7 +703,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 月曆控制列 */}
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-4 px-2">
                   <button
@@ -759,7 +728,6 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 星期標題 */}
                 <div className="grid grid-cols-7 gap-1.5 text-center text-xs text-[#8A7968] mb-2">
                   {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
                     <div key={d} className="py-1 font-medium">
@@ -768,7 +736,6 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* 日期網格 */}
                 <div className="grid grid-cols-7 gap-1.5">
                   {calendarDays.map((cell, idx) => {
                     if (!cell) return <div key={`empty-${idx}`} className="h-16" />;
@@ -815,7 +782,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 11:00 ~ 19:00 時段按鈕區 (每 30 分鐘一區間) */}
               {selectedDate && (
                 <div className="pt-5 border-t border-[#ECE6DA]">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -871,7 +837,6 @@ export default function App() {
               )}
             </section>
 
-            {/* STEP 4: 備註與確認送出 */}
             <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
                 <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
@@ -903,7 +868,6 @@ export default function App() {
         </div>
       )}
 
-      {/* 預約成功彈窗 Modal */}
       {bookingSuccessModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#F7F4EF] border border-[#D8CBB8] rounded-3xl max-w-md w-full p-7 shadow-2xl">
@@ -961,13 +925,9 @@ export default function App() {
         </div>
       )}
 
-      {/* =====================================================
-          VIEW 2: 設計師後台管理介面 (Admin Dashboard)
-      ===================================================== */}
       {activeView === 'admin' && (
         <div className="max-w-5xl mx-auto px-4 pt-8">
           {!isAdminAuthenticated ? (
-            /* 後台登入驗證畫面 */
             <div className="max-w-md mx-auto bg-white border border-[#E5DEC9] rounded-3xl p-8 shadow-sm mt-8">
               <div className="w-12 h-12 rounded-2xl bg-[#2C2520] text-[#C8B9A6] flex items-center justify-center mb-4">
                 <Lock className="w-5 h-5" />
@@ -1017,9 +977,7 @@ export default function App() {
               </form>
             </div>
           ) : (
-            /* 後台主控台 */
             <div className="space-y-6">
-              {/* 後台頂部導覽與分頁切換 */}
               <div className="bg-white border border-[#E5DEC9] rounded-3xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1077,9 +1035,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* ==========================================
-                  TAB 1: 訂單管理 (Appointments)
-              ========================================== */}
               {adminTab === 'appointments' && (
                 <div className="space-y-4">
                   {[...appointments]
@@ -1130,7 +1085,6 @@ export default function App() {
                             )}
                           </div>
 
-                          {/* 訂單操作按鈕群 */}
                           <div className="flex flex-wrap items-center gap-2 shrink-0">
                             {appt.status === 'pending' && (
                               <button
@@ -1174,9 +1128,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* ==========================================
-                  TAB 2: 行事曆與時段管理 (Schedule)
-              ========================================== */}
               {adminTab === 'schedule' && (
                 <div className="bg-white border border-[#E5DEC9] rounded-3xl p-6 shadow-sm space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#ECE6DA]">
@@ -1209,13 +1160,11 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* 時段狀態矩陣 */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-3">
                     {ALL_DAILY_SLOTS.map((slot) => {
                       const availDoc = availability.find((a) => a.date === scheduleDate);
                       const isBlocked = availDoc ? availDoc.blockedSlots.includes(slot) : false;
 
-                      // 檢查該時段是否有對應的已確認訂單
                       const occupyingAppt = appointments.find((apt) => {
                         if (apt.date !== scheduleDate || apt.status !== 'confirmed') return false;
                         const srv = services.find((s) => s.id === apt.serviceId);
@@ -1264,12 +1213,8 @@ export default function App() {
                 </div>
               )}
 
-              {/* ==========================================
-                  TAB 3: 服務與價格設定 (Services Setup CRUD)
-              ========================================== */}
               {adminTab === 'services' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* 左側：新增 / 編輯表單 */}
                   <form
                     onSubmit={handleSaveService}
                     className="bg-white border border-[#E5DEC9] rounded-3xl p-6 shadow-sm space-y-4 h-fit"
@@ -1355,7 +1300,6 @@ export default function App() {
                     </div>
                   </form>
 
-                  {/* 右側：現有服務列表 */}
                   <div className="lg:col-span-2 space-y-3">
                     {services.map((srv) => (
                       <div
@@ -1405,7 +1349,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* LINE Messaging API / LIFF 觸發紀錄監控面板 */}
               <div className="bg-[#2C2520] text-[#EBE5DC] rounded-3xl p-6 shadow-md">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
