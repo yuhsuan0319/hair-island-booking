@@ -2,22 +2,24 @@ import React, { useState, useEffect } from 'react';
 
 export default function App() {
   const [clientName, setClientName] = useState('');
-  const [lineUserId, setLineUserId] = useState('');
   const [serviceItem, setServiceItem] = useState('精油頭皮養護 + 質感剪髮');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  // 當網頁載入時，嘗試自動透過 LINE LIFF 抓取使用者的 LINE 帳號
+  // 自動抓取 LINE 使用者名稱
   useEffect(() => {
-    // 檢查是否有引入 liff 物件
+    // 檢查有沒有載入 LINE LIFF SDK
     if (window.liff) {
-      window.liff.init({ liffId: "你的LIFF_ID" }) // 如果有設定 LIFF ID 可以填入，沒有的話會自動略過
+      window.liff.init({ liffId: "你的LIFF_ID" }) // 填入你的 LIFF ID，若無可先保留
         .then(() => {
           if (window.liff.isLoggedIn()) {
             window.liff.getProfile().then(profile => {
+              // 自動把 LINE 名稱填入客戶姓名欄位
               setClientName(profile.displayName);
-              setLineUserId(profile.userId);
-            }).catch(err => console.log('抓取 LINE 檔案失敗', err));
+            }).catch(err => console.log('取得個人檔案失敗', err));
+          } else {
+            // 如果還沒登入，引導登入 LINE
+            window.liff.login();
           }
         })
         .catch(err => console.log('LIFF 初始化失敗', err));
@@ -26,7 +28,6 @@ export default function App() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // 這裡可以把 clientName, lineUserId, serviceItem, appointmentTime 送到你的 Google 試算表或後端
     setSubmitted(true);
   };
 
@@ -36,7 +37,6 @@ export default function App() {
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', color: '#2c2c2c', margin: '0 0 8px 0' }}>髮嶼 HAIR ISLAND</h1>
           <p style={{ fontSize: '14px', color: '#7a7a7a', margin: '0' }}>專屬質感沙龍・線上預約系統</p>
-          {lineUserId && <p style={{ fontSize: '11px', color: '#2b580c', marginTop: '6px' }}>已成功連動 LINE 帳號</p>}
         </div>
 
         {submitted ? (
@@ -61,8 +61,8 @@ export default function App() {
                 required
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
-                placeholder="請輸入您的姓名"
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px', boxSizing: 'border-box' }}
+                placeholder="載入中或請輸入姓名"
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px', boxSizing: 'border-box', backgroundColor: '#fafafa' }}
               />
             </div>
 
