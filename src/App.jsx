@@ -266,7 +266,7 @@ export default function App() {
               <textarea 
                 value={remark}
                 onChange={(e) => setRemark(e.target.value)}
-                placeholder="例如：希望加強肩頸放鬆、特殊髮況說明..."
+                placeholder="例如：比預約時間早或晚到、特殊髮況說明等..."
                 rows="3"
                 style={{
                   display: 'block',
