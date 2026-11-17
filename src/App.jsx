@@ -86,11 +86,12 @@ export default function App() {
     setSubmitted(true);
   };
 
-  // 統一所有輸入與選擇欄位的樣式，確保左右邊界與高度 100% 齊平
+  // 統一所有輸入與選擇欄位的樣式
   const fieldStyle = {
     display: 'block',
     width: '100%',
     height: '46px',
+    lineHeight: '44px',
     padding: '0 14px',
     borderRadius: '10px',
     border: '1px solid #dcd6cd',
@@ -116,15 +117,27 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fdfbf7', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', boxSizing: 'border-box' }}>
       <style>{`
+        /* 強制修正 iOS 日期選擇器垂直與水平置中問題 */
         input[type="date"] {
+          display: -webkit-inline-flex !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
           -webkit-appearance: none;
           appearance: none;
           min-width: 100%;
           max-width: 100%;
+          height: 46px;
+          line-height: 44px;
+          padding: 0 14px;
+          box-sizing: border-box;
         }
         input[type="date"]::-webkit-date-and-time-value {
-          text-align: left;
-          margin: 0;
+          margin: auto 0 !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          height: 100%;
+          line-height: normal;
         }
         .select-wrapper {
           position: relative;
@@ -197,16 +210,18 @@ export default function App() {
               </div>
             </div>
 
-            {/* 2. 預約日期 */}
+            {/* 2. 預約日期（修正垂直置中並加上右側小箭頭保持視覺一致） */}
             <div style={{ width: '100%', boxSizing: 'border-box' }}>
               <label style={labelStyle}>選擇預約日期</label>
-              <input 
-                type="date" 
-                required
-                value={appointmentDate}
-                onChange={(e) => setAppointmentDate(e.target.value)}
-                style={fieldStyle}
-              />
+              <div className="select-wrapper">
+                <input 
+                  type="date" 
+                  required
+                  value={appointmentDate}
+                  onChange={(e) => setAppointmentDate(e.target.value)}
+                  style={fieldStyle}
+                />
+              </div>
             </div>
 
             {/* 3. 預約時間（時 / 分 兩欄並排滾動選擇） */}
