@@ -23,7 +23,6 @@ function App() {
       })
       .catch((err) => {
         console.error('LIFF 初始化失敗', err);
-        // 本機測試時若不在 LINE 內，給予預設名稱方便預覽
         setDisplayName('訪客 (測試中)');
       });
   }, []);
@@ -34,7 +33,37 @@ function App() {
       alert('請選擇預約日期！');
       return;
     }
-    setSubmitted(true);
+
+    // 組合要發送到 LINE 聊天室的預約訊息文字
+    const messageText = `✨ 【髮嶼 HAIR ISLAND 預約通知】 ✨\n` +
+      `👤 貴賓姓名：${displayName}\n` +
+      `✂️ 預約項目：${service}\n` +
+      `📅 預約日期：${date}\n` +
+      `⏰ 預約時段：${time}\n` +
+      `📝 備註需求：${note || '無'}\n` +
+      `----------------------------\n` +
+      `我們已收到您的預約，將盡快為您確認！`;
+
+    // 檢查目前是否在 LINE 環境中，若在 LINE 內則直接發送訊息到聊天室
+    if (liff.isInClient()) {
+      liff.sendMessages([
+        {
+          type: 'text',
+          text: messageText
+        }
+      ])
+      .then(() => {
+        // 發送成功後關閉 LIFF 視窗（或保留在成功畫面）
+        setSubmitted(true);
+      })
+      .catch((err) => {
+        console.error('訊息發送失敗', err);
+        setSubmitted(true);
+      });
+    } else {
+      // 若是在電腦網頁測試，則直接顯示成功畫面
+      setSubmitted(true);
+    }
   };
 
   return (
@@ -134,7 +163,7 @@ function App() {
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>✨</div>
             <h3 style={{ margin: '0 0 10px 0', color: '#2c2c2c' }}>預約資訊已送出！</h3>
             <p style={{ color: '#666', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
-              謝謝 <strong>{displayName}</strong>，我們已收到您的預約申請：<br/>
+              謝謝 <strong>{displayName}</strong>，預約明細已發送至您的聊天室：<br/>
               📌 項目：<strong>{service}</strong><br/>
               📅 日期：<strong>{date}</strong> ({time})
             </p>
@@ -150,7 +179,7 @@ function App() {
                 cursor: 'pointer' 
               }}
             >
-              修改預約內容
+              再次預約 / 修改內容
             </button>
           </div>
         )}
