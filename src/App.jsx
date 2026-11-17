@@ -1,166 +1,292 @@
 import React, { useState, useEffect } from 'react';
 
 export default function App() {
-  const [userName, setUserName] = useState(''); // 預設留空，完全依賴 LINE 登入抓取
+  const [userName, setUserName] = useState('');
+  const [userId, setUserId] = useState('');
+  const [liffReady, setLiffReady] = useState(false);
+
   const [serviceItem, setServiceItem] = useState('質感剪髮');
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [remark, setRemark] = useState('');
+
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 自動透過 LINE LIFF 抓取登入的使用者名稱
+  // 每 30 分鐘一格的預約時段清單
+  const timeSlots = [
+    '10:00', '10:30', '11:00', '11:30',
+    '12:00', '12:30', '13:00', '13:30',
+    '14:00', '14:30', '15:00', '15:30',
+    '16:00', '16:30', '17:00', '17:30',
+    '18:00', '18:30', '19:00', '19:30',
+    '20:00'
+  ];
+
+  // 自動載入並初始化 LINE LIFF 抓取使用者名稱
   useEffect(() => {
-    if (window.liff) {
-      window.liff.init({ liffId: "2012650134-fNn1I0l8" })
-        .then(() => {
-          if (window.liff.isLoggedIn()) {
-            window.liff.getProfile().then(profile => {
-              setUserName(profile.displayName);
-            }).catch(err => console.log('取得 LINE 個人檔案失敗', err));
-          } else {
-            window.liff.login();
-          }
-        })
-        .catch(err => console.log('LIFF 初始化失敗', err));
-    }
+    const initLiff = async () => {
+      try {
+        // 若 index.html 尚未引入 LIFF SDK，自動動態載入確保不報錯
+        if (!window.liff) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+        }
+
+        await window.liff.init({ liffId: '2012650134-fNn1I0l8' });
+        setLiffReady(true);
+
+        if (window.liff.isLoggedIn()) {
+          const profile = await window.liff.getProfile();
+          setUserName(profile.displayName);
+          setUserId(profile.userId);
+        } else {
+          window.liff.login();
+        }
+      } catch (err) {
+        console.error('LIFF 初始化失敗:', err);
+        setLiffReady(true);
+      }
+    };
+
+    initLiff();
   }, []);
 
-  // 點擊送出時，串接 Google Apps Script 發送 LINE 預約推播通知
+  // 送出表單並觸發 Google Apps Script LINE 推播
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!userName) {
-      alert('正在讀取您的 LINE 帳號，請稍候再試...');
-      return;
-    }
     if (!appointmentDate || !appointmentTime) {
       alert('請完整選擇預約日期與時間');
       return;
     }
 
     setIsSubmitting(true);
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzz6sxxZ-pArV_MJ2yypT6gUuMaZQEmXXM597ayfQcJIlWuYvAYISavd4MGR4cytpw0/exec";
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzz6sxxZ-pArV_MJ2yypT6gUuMaZQEmXXM597ayfQcJIlWuYvAYISavd4MGR4cytpw0/exec';
 
     try {
       await fetch(GAS_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientName: userName,
+          clientName: userName || 'LINE 貴賓',
+          userId: userId,
           serviceItem: serviceItem,
+          appointmentDate: appointmentDate,
           appointmentTime: `${appointmentDate} ${appointmentTime}`,
-          remark: remark || "無"
+          remark: remark || '無'
         })
       });
     } catch (error) {
-      console.error("發送通知失敗", error);
+      console.error('發送預約通知失敗:', error);
     }
 
     setIsSubmitting(false);
     setSubmitted(true);
   };
 
+  // 統一所有選擇欄位的樣式，強制左右邊界與高度 100% 齊平
+  const fieldStyle = {
+    display: 'block',
+    width: '100%',
+    height: '46px',
+    padding: '0 14px',
+    borderRadius: '10px',
+    border: '1px solid #dcd6cd',
+    fontSize: '15px',
+    color: '#2c2c2c',
+    backgroundColor: '#ffffff',
+    boxSizing: 'border-box',
+    WebkitAppearance: 'none',
+    MozAppearance: 'none',
+    appearance: 'none',
+    outline: 'none',
+    margin: 0
+  };
+
+  const labelStyle = {
+    display: 'block',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#4a453e',
+    marginBottom: '6px'
+  };
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#fdfbf7', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px', fontFamily: 'sans-serif' }}>
-      <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#ffffff', padding: '36px 28px', borderRadius: '20px', boxShadow: '0 4px 24px rgba(0,0,0,0.04)', border: '1px solid #eae6df', textAlign: 'center', boxSizing: 'border-box' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#fdfbf7', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', boxSizing: 'border-box' }}>
+      {/* 強制修正 iOS 日期選擇器與下拉選單對齊的內嵌樣式 */}
+      <style>{`
+        input[type="date"] {
+          -webkit-appearance: none;
+          appearance: none;
+          min-width: 100%;
+          max-width: 100%;
+        }
+        input[type="date"]::-webkit-date-and-time-value {
+          text-align: left;
+          margin: 0;
+        }
+        .select-wrapper {
+          position: relative;
+          width: 100%;
+        }
+        .select-wrapper::after {
+          content: "▾";
+          font-size: 14px;
+          color: #888888;
+          position: absolute;
+          right: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          pointer-events: none;
+        }
+      `}</style>
+
+      <div style={{ width: '100%', maxWidth: '420px', backgroundColor: '#ffffff', padding: '32px 24px', borderRadius: '20px', boxShadow: '0 4px 24px rgba(0,0,0,0.05)', border: '1px solid #eae6df', textAlign: 'center', boxSizing: 'border-box' }}>
         
-        {/* 標題與副標 */}
-        <h1 style={{ fontSize: '26px', color: '#2c2c2c', margin: '0 0 6px 0', letterSpacing: '1px' }}>髮嶼 HAIR ISLAND</h1>
+        {/* 品牌標題 */}
+        <h1 style={{ fontSize: '24px', color: '#2c2c2c', margin: '0 0 6px 0', letterSpacing: '1.5px', fontWeight: '700' }}>髮嶼 HAIR ISLAND</h1>
         <p style={{ fontSize: '13px', color: '#888888', margin: '0 0 20px 0' }}>專屬頭皮養護與美髮預約</p>
 
-        {/* 歡迎回來橫幅 */}
-        <div style={{ backgroundColor: '#f5f2eb', padding: '12px 16px', borderRadius: '10px', marginBottom: '24px', display: 'inline-block', width: '100%', boxSizing: 'border-box' }}>
-          <span style={{ fontSize: '14px', color: '#4a453e', fontWeight: '500' }}>
-            {userName ? `歡迎回來，${userName} 貴賓！` : '正在讀取您的 LINE 身分...'}
+        {/* LINE 使用者歡迎橫幅 */}
+        <div style={{ backgroundColor: '#f5f2eb', padding: '12px 16px', borderRadius: '10px', marginBottom: '24px', width: '100%', boxSizing: 'border-box' }}>
+          <span style={{ fontSize: '14px', color: '#4a453e', fontWeight: '600' }}>
+            {userName ? `歡迎回來，${userName} 貴賓！` : (liffReady ? '歡迎光臨，貴賓！' : '正在讀取 LINE 帳號資訊...')}
           </span>
         </div>
 
         {submitted ? (
           <div>
-            <div style={{ fontSize: '32px', marginBottom: '10px' }}>✨</div>
+            <div style={{ fontSize: '36px', marginBottom: '8px' }}>✨</div>
             <h2 style={{ fontSize: '20px', color: '#2c2c2c', margin: '0 0 16px 0' }}>預約資訊已送出！</h2>
             
-            <div style={{ fontSize: '14px', color: '#555555', lineHeight: '1.8', marginBottom: '24px', textAlign: 'left', backgroundColor: '#faf8f5', padding: '16px 20px', borderRadius: '12px' }}>
-              謝謝 <strong>{userName}</strong>，我們已收到您的預約申請：<br />
-              📌 項目：<strong>{serviceItem}</strong><br />
-              📅 日期：<strong>{appointmentDate}</strong><br />
-              ⏰ 時間：<strong>{appointmentTime}</strong><br />
-              💬 備註：<strong>{remark || '無'}</strong>
+            <div style={{ fontSize: '14px', color: '#555555', lineHeight: '1.9', marginBottom: '24px', textAlign: 'left', backgroundColor: '#faf8f5', padding: '16px 20px', borderRadius: '12px', border: '1px solid #f0ece4', boxSizing: 'border-box' }}>
+              謝謝 <strong>{userName || '貴賓'}</strong>，我們已收到您的預約申請：<br />
+              📌 預約項目：<strong>{serviceItem}</strong><br />
+              📅 預約日期：<strong>{appointmentDate}</strong><br />
+              ⏰ 預約時間：<strong>{appointmentTime}</strong><br />
+              💬 備註事項：<strong>{remark || '無'}</strong>
             </div>
 
             <button 
               onClick={() => { setSubmitted(false); setRemark(''); }}
-              style={{ width: '100%', padding: '12px', backgroundColor: '#f0ece4', color: '#4a453e', border: '1px solid #dcd6cd', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+              style={{ width: '100%', height: '46px', backgroundColor: '#f0ece4', color: '#4a453e', border: '1px solid #dcd6cd', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', boxSizing: 'border-box' }}
             >
               修改預約內容
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#444', marginBottom: '6px' }}>選擇預約項目</label>
-              <select 
-                value={serviceItem}
-                onChange={(e) => setServiceItem(e.target.value)}
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', backgroundColor: '#fff', boxSizing: 'border-box' }}
-              >
-                <option value="質感剪髮">質感剪髮</option>
-                <option value="精油頭皮養護">精油頭皮養護</option>
-                <option value="經典質感染髮">經典質感染髮</option>
-                <option value="日系溫塑燙髮">日系溫塑燙髮</option>
-              </select>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left', width: '100%', boxSizing: 'border-box' }}>
+            
+            {/* 1. 預約項目（下拉選擇） */}
+            <div style={{ width: '100%', boxSizing: 'border-box' }}>
+              <label style={labelStyle}>選擇預約項目</label>
+              <div className="select-wrapper">
+                <select 
+                  value={serviceItem}
+                  onChange={(e) => setServiceItem(e.target.value)}
+                  style={fieldStyle}
+                >
+                  <option value="質感剪髮">質感剪髮</option>
+                  <option value="精油頭皮養護">精油頭皮養護</option>
+                  <option value="精油頭皮養護 + 質感剪髮">精油頭皮養護 + 質感剪髮</option>
+                  <option value="經典質感染髮">經典質感染髮</option>
+                  <option value="日系溫塑燙髮">日系溫塑燙髮</option>
+                  <option value="深度放鬆洗護專案">深度放鬆洗護專案</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#444', marginBottom: '6px' }}>選擇預約日期</label>
+            {/* 2. 預約日期（日曆選擇） */}
+            <div style={{ width: '100%', boxSizing: 'border-box' }}>
+              <label style={labelStyle}>選擇預約日期</label>
               <input 
                 type="date" 
                 required
                 value={appointmentDate}
                 onChange={(e) => setAppointmentDate(e.target.value)}
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', backgroundColor: '#fff', boxSizing: 'border-box' }}
+                style={fieldStyle}
               />
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#444', marginBottom: '6px' }}>選擇預約時間（每30分鐘一格）</label>
-              <select 
-                value={appointmentTime}
-                onChange={(e) => setAppointmentTime(e.target.value)}
-                required
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', backgroundColor: '#fff', boxSizing: 'border-box' }}
-              >
-                <option value="">請選擇時段</option>
-                <option value="10:00 AM">10:00 AM</option>
-                <option value="10:30 AM">10:30 AM</option>
-                <option value="11:00 AM">11:00 AM</option>
-                <option value="11:30 AM">11:30 AM</option>
-                <option value="12:00 PM">12:00 PM</option>
-                <option value="12:30 PM">12:30 PM</option>
-                <option value="01:00 PM">01:00 PM</option>
-                <option value="01:30 PM">01:30 PM</option>
-                <option value="02:00 PM">02:00 PM</option>
-                <option value="02:30 PM">02:30 PM</option>
-                <option value="03:00 PM">03:00 PM</option>
-                <option value="03:30 PM">03:30 PM</option>
-                <option value="04:00 PM">04:00 PM</option>
-                <option value="04:30 PM">04:30 PM</option>
-                <option value="05:00 PM">05:00 PM</option>
-                <option value="05:30 PM">05:30 PM</option>
-                <option value="06:00 PM">06:00 PM</option>
-                <option value="06:30 PM">06:30 PM</option>
-                <option value="07:00 PM">07:00 PM</option>
-                <option value="07:30 PM">07:30 PM</option>
-                <option value="08:00 PM">08:00 PM</option>
-              </select>
+            {/* 3. 預約時間（每30分鐘一格下拉選擇） */}
+            <div style={{ width: '100%', boxSizing: 'border-box' }}>
+              <label style={labelStyle}>選擇預約時間</label>
+              <div className="select-wrapper">
+                <select 
+                  value={appointmentTime}
+                  onChange={(e) => setAppointmentTime(e.target.value)}
+                  required
+                  style={{
+                    ...fieldStyle,
+                    color: appointmentTime ? '#2c2c2c' : '#888888'
+                  }}
+                >
+                  <option value="" disabled>請選擇預約時段（每 30 分鐘一格）</option>
+                  {timeSlots.map((time) => (
+                    <option key={time} value={time} style={{ color: '#2c2c2c' }}>
+                      {time}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#444', marginBottom: '6px' }}>備註事項（選填）</label>
+            {/* 4. 備註事項 */}
+            <div style={{ width: '100%', boxSizing: 'border-box' }}>
+              <label style={labelStyle}>備註事項（選填）</label>
               <textarea 
                 value={remark}
                 onChange={(e) => setRemark(e.target.value)}
-                placeholder="例如：指定設計師、希望加強頭皮按摩等..."
-                rows="2"
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '
+                placeholder="例如：希望加強肩頸放鬆、特殊髮況說明..."
+                rows="3"
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #dcd6cd',
+                  fontSize: '15px',
+                  color: '#2c2c2c',
+                  backgroundColor: '#ffffff',
+                  boxSizing: 'border-box',
+                  resize: 'none',
+                  outline: 'none',
+                  margin: 0,
+                  fontFamily: 'inherit'
+                }}
+              />
+            </div>
+
+            {/* 送出按鈕 */}
+            <button 
+              type="submit"
+              disabled={isSubmitting}
+              style={{
+                marginTop: '6px',
+                width: '100%',
+                height: '48px',
+                backgroundColor: isSubmitting ? '#7a7a7a' : '#2c2c2c',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '10px',
+                fontSize: '15px',
+                fontWeight: '600',
+                letterSpacing: '1px',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                boxSizing: 'border-box'
+              }}
+            >
+              {isSubmitting ? '預約傳送中...' : '確認送出預約'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
