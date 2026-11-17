@@ -1,14 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function App() {
   const [clientName, setClientName] = useState('');
+  const [lineUserId, setLineUserId] = useState('');
   const [serviceItem, setServiceItem] = useState('精油頭皮養護 + 質感剪髮');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
+  // 當網頁載入時，嘗試自動透過 LINE LIFF 抓取使用者的 LINE 帳號
+  useEffect(() => {
+    // 檢查是否有引入 liff 物件
+    if (window.liff) {
+      window.liff.init({ liffId: "你的LIFF_ID" }) // 如果有設定 LIFF ID 可以填入，沒有的話會自動略過
+        .then(() => {
+          if (window.liff.isLoggedIn()) {
+            window.liff.getProfile().then(profile => {
+              setClientName(profile.displayName);
+              setLineUserId(profile.userId);
+            }).catch(err => console.log('抓取 LINE 檔案失敗', err));
+          }
+        })
+        .catch(err => console.log('LIFF 初始化失敗', err));
+    }
+  }, []);
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    // 這裡可以串接你的 Google Apps Script 網頁應用程式網址來發送預約資料
+    // 這裡可以把 clientName, lineUserId, serviceItem, appointmentTime 送到你的 Google 試算表或後端
     setSubmitted(true);
   };
 
@@ -18,6 +36,7 @@ export default function App() {
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', color: '#2c2c2c', margin: '0 0 8px 0' }}>髮嶼 HAIR ISLAND</h1>
           <p style={{ fontSize: '14px', color: '#7a7a7a', margin: '0' }}>專屬質感沙龍・線上預約系統</p>
+          {lineUserId && <p style={{ fontSize: '11px', color: '#2b580c', marginTop: '6px' }}>已成功連動 LINE 帳號</p>}
         </div>
 
         {submitted ? (
@@ -74,7 +93,7 @@ export default function App() {
 
             <button 
               type="submit"
-              style={{ marginTop: '12px', padding: '12px', backgroundColor: '#2c2c2c', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer', transition: 'background 0.2s' }}
+              style={{ marginTop: '12px', padding: '12px', backgroundColor: '#2c2c2c', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}
             >
               確認送出預約
             </button>
