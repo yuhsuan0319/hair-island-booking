@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 export default function App() {
   const [userName, setUserName] = useState('鄭宇軒Peter'); 
   const [serviceItem, setServiceItem] = useState('質感剪髮');
-  const [appointmentDate, setAppointmentDate] = useState(''); // 預設留空讓使用者選擇
+  const [appointmentDate, setAppointmentDate] = useState('2026-11-19 15:30');
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 自動透過 LINE LIFF 抓取登入的使用者名稱
   useEffect(() => {
@@ -23,12 +24,32 @@ export default function App() {
     }
   }, []);
 
-  const handleSubmit = (e) => {
+  // 點擊送出時，串接 Google Apps Script 發送 LINE 預約推播通知
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!appointmentDate) {
-      alert('請選擇預約日期與時間');
-      return;
+    setIsSubmitting(true);
+
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzz6sxxZ-pArV_MJ2yypT6gUuMaZQEmXXM597ayfQcJIlWuYvAYISavd4MGR4cytpw0/exec";
+
+    try {
+      // 透過 fetch 將預約資料送給 GAS 後端觸發推播
+      await fetch(GAS_URL, {
+        method: "POST",
+        mode: "no-cors", // 避免瀏覽器 CORS 擋住
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clientName: userName,
+          serviceItem: serviceItem,
+          appointmentTime: appointmentDate
+        })
+      });
+    } catch (error) {
+      console.error("發送通知失敗", error);
     }
+
+    setIsSubmitting(false);
     setSubmitted(true);
   };
 
@@ -53,7 +74,7 @@ export default function App() {
             <div style={{ fontSize: '14px', color: '#555555', lineHeight: '1.8', marginBottom: '24px', textAlign: 'left', backgroundColor: '#faf8f5', padding: '16px 20px', borderRadius: '12px' }}>
               謝謝 <strong>{userName}</strong>，我們已收到您的預約申請：<br />
               📌 項目：<strong>{serviceItem}</strong><br />
-              📅 日期：<strong>{appointmentDate.replace('T', ' ')}</strong>
+              📅 日期：<strong>{appointmentDate}</strong>
             </div>
 
             <button 
@@ -80,22 +101,21 @@ export default function App() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#444', marginBottom: '6px' }}>選擇預約日期與時間</label>
-              {/* 改用 datetime-local 讓手機與電腦都能直接點擊跳出選單 */}
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#444', marginBottom: '6px' }}>預約日期與時間</label>
               <input 
-                type="datetime-local" 
-                required
+                type="text" 
                 value={appointmentDate}
                 onChange={(e) => setAppointmentDate(e.target.value)}
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', boxSizing: 'border-box', backgroundColor: '#fff' }}
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', boxSizing: 'border-box' }}
               />
             </div>
 
             <button 
               type="submit"
+              disabled={isSubmitting}
               style={{ marginTop: '8px', width: '100%', padding: '14px', backgroundColor: '#2c2c2c', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}
             >
-              確認送出預約
+              {isSubmitting ? '送出中...' : '確認送出預約'}
             </button>
           </form>
         )}
