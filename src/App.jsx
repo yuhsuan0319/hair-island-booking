@@ -1,30 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 export default function App() {
   const [clientName, setClientName] = useState('');
   const [serviceItem, setServiceItem] = useState('精油頭皮養護 + 質感剪髮');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [submitted, setSubmitted] = useState(false);
-
-  // 自動抓取 LINE 使用者名稱
-  useEffect(() => {
-    // 檢查有沒有載入 LINE LIFF SDK
-    if (window.liff) {
-      window.liff.init({ liffId: "你的LIFF_ID" }) // 填入你的 LIFF ID，若無可先保留
-        .then(() => {
-          if (window.liff.isLoggedIn()) {
-            window.liff.getProfile().then(profile => {
-              // 自動把 LINE 名稱填入客戶姓名欄位
-              setClientName(profile.displayName);
-            }).catch(err => console.log('取得個人檔案失敗', err));
-          } else {
-            // 如果還沒登入，引導登入 LINE
-            window.liff.login();
-          }
-        })
-        .catch(err => console.log('LIFF 初始化失敗', err));
-    }
-  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -61,8 +41,8 @@ export default function App() {
                 required
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
-                placeholder="載入中或請輸入姓名"
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px', boxSizing: 'border-box', backgroundColor: '#fafafa' }}
+                placeholder="請輸入您的姓名"
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px', boxSizing: 'border-box' }}
               />
             </div>
 
