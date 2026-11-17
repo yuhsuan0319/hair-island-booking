@@ -1,1076 +1,1451 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { 
+  Calendar, Clock, User, Phone, CheckCircle2, AlertCircle, 
+  Sparkles, ShieldCheck, BellRing, Settings, Scissors, 
+  Plus, Trash2, Edit3, Lock, Unlock, MessageSquare, 
+  ChevronLeft, ChevronRight, LogOut, Check, X, Info
+} from 'lucide-react';
 
-const ADMIN_USER_ID = 'U5e88b1121f054ba725948e898394016e';
-const LIFF_ID = '2012650134-fNn1I0l8';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzz6sxxZ-pArV_MJ2yypT6gUuMaZQEmXXM597ayfQcJIlWuYvAYISavd4MGR4cytpw0/exec';
+// ==========================================
+// 1. 初始模擬資料庫 (對應 Firestore Schema)
+// ==========================================
+const getTodayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
-// 預設系統設定（可在手機後台隨時修改並同步至雲端）
-const DEFAULT_CONFIG = {
-  brandSub: 'ONLINE BOOKING',
-  heroTitle1: '留一段時間，',
-  heroTitle2: '給質感與放鬆的自己。',
-  heroDesc: '選擇日期與服務，尚可預約的時間會清楚顯示。',
-  igUrl: 'https://instagram.com',
-  fbUrl: 'https://facebook.com',
-  lineUrl: 'https://line.me/R/ti/p/@992nilsd',
-  notices: [
-    '本店採完全預約制，提供專屬一對一服務',
-    '染燙或特殊造型需求歡迎先至官方 LINE 傳圖討論',
-    '當天保留 10 分鐘；無故未到 2 次將不再提供預約',
-    '若需同時施作多項深度養護，系統皆可直接複選',
-    '有任何問題請到官方 LINE 傳訊息討論 😊'
-  ],
-  services: [
-    { id: 's1', name: '質感剪髮', price: '$600 起' },
-    { id: 's2', name: '精油頭皮養護', price: '$1,200 起' },
-    { id: 's3', name: '深層結構護髮', price: '$1,500 起' },
-    { id: 's4', name: '經典質感染髮', price: '$2,200 起' },
-    { id: 's5', name: '日系溫塑燙髮', price: '$2,800 起' },
-    { id: 's6', name: '深度放鬆洗護專案', price: '$800' }
-  ],
-  defaultSlots: ['10:00', '11:30', '13:30', '15:00', '16:30', '18:00', '19:30'],
-  // 單日特殊設定：status 可為 'open'(自訂時段), 'closed'(店休), 'full'(額滿)
-  dateOverrides: {
-    '2026-11-18': { status: 'full', slots: [] },
-    '2026-11-19': { status: 'full', slots: [] },
-    '2026-11-21': { status: 'full', slots: [] },
-    '2026-11-25': { status: 'full', slots: [] },
-    '2026-11-30': { status: 'closed', slots: [] }
+const getFutureDateStr = (daysToAdd) => {
+  const d = new Date();
+  d.setDate(d.getDate() + daysToAdd);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const INITIAL_SERVICES = [
+  { id: 'srv-1', name: '島嶼深層頭皮養護 SPA', price: 1800, duration: 90, desc: '溫和淨化毛囊角質，搭配肩頸溫感精油舒壓與草本蒸氣護理' },
+  { id: 'srv-2', name: '質感結構剪髮＋木質調洗髮', price: 1000, duration: 60, desc: '依頭型與落髮流向精準剪裁，含鬆弛感芳療洗髮' },
+  { id: 'srv-3', name: '植萃溫和染髮（含結構護髮）', price: 3200, duration: 150, desc: '低敏植萃染膏，補充髮芯角蛋白，呈現自然霧感染澤' },
+  { id: 'srv-4', name: '水質感鬆弛燙髮（含剪髮）', price: 3800, duration: 180, desc: '低溫塑型打造自然波紋，吹乾即可呈現蓬鬆空氣感' },
+  { id: 'srv-5', name: '瞬效金緻結構深層護髮', price: 1500, duration: 60, desc: '四劑式分子滲透修護，針對受損與乾燥髮尾重建光澤' }
+];
+
+const INITIAL_APPOINTMENTS = [
+  {
+    id: 'apt-1001',
+    liffUserId: 'U89a1b2c3d4e5f6g7h8i9j0',
+    customerName: '林知夏',
+    phone: '0912-345-678',
+    serviceId: 'srv-1',
+    date: getFutureDateStr(1),
+    time: '13:00',
+    endTime: '14:30',
+    status: 'confirmed',
+    remark: '近期頭皮較敏感，希望力道偏輕柔。'
   },
-  locationName: '髮嶼 HAIR ISLAND',
-  locationAddress: '台南市善化區',
-  locationNote: '（專屬預約制質感沙龍）',
-  mapQuery: '台南市善化區'
+  {
+    id: 'apt-1002',
+    liffUserId: 'U11b2c3d4e5f6g7h8i9j0k1',
+    customerName: '陳沐恩',
+    phone: '0928-888-168',
+    serviceId: 'srv-3',
+    date: getFutureDateStr(1),
+    time: '15:30',
+    endTime: '18:00',
+    status: 'pending',
+    remark: '想染偏冷茶棕色，遮蓋少量白髮。'
+  },
+  {
+    id: 'apt-1003',
+    liffUserId: 'U55f6g7h8i9j0k1l2m3n4o5',
+    customerName: '張語恬',
+    phone: '0933-777-999',
+    serviceId: 'srv-2',
+    date: getFutureDateStr(2),
+    time: '11:00',
+    endTime: '12:00',
+    status: 'confirmed',
+    remark: '修剪瀏海與髮尾層次。'
+  }
+];
+
+const INITIAL_AVAILABILITY = [
+  {
+    date: getFutureDateStr(1),
+    // 13:00-14:30 為 apt-1001 已確認鎖定；12:00-13:00 為設計師手動午休鎖定
+    blockedSlots: ['12:00', '12:30', '13:00', '13:30', '14:00']
+  },
+  {
+    date: getFutureDateStr(2),
+    blockedSlots: ['11:00', '11:30', '15:00', '15:30']
+  }
+];
+
+// 11:00 至 18:30 為可點擊之起始點（營業至 19:00）
+const ALL_DAILY_SLOTS = [
+  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+  '17:00', '17:30', '18:00', '18:30'
+];
+
+// ==========================================
+// 2. 時段計算輔助函式 (Time Slot Engine)
+// ==========================================
+const timeToMins = (t) => {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+};
+
+const minsToTime = (mins) => {
+  const h = String(Math.floor(mins / 60)).padStart(2, '0');
+  const m = String(mins % 60).padStart(2, '0');
+  return `${h}:${m}`;
+};
+
+// 根據起始時間與時長，展開所需佔用的所有 30 分鐘時段陣列
+const expandRequiredSlots = (startTime, durationMinutes) => {
+  const slotsCount = Math.ceil(durationMinutes / 30);
+  const startMins = timeToMins(startTime);
+  const result = [];
+  for (let i = 0; i < slotsCount; i++) {
+    result.push(minsToTime(startMins + i * 30));
+  }
+  return result;
 };
 
 export default function App() {
-  // LIFF 與使用者狀態
-  const [userName, setUserName] = useState('');
-  const [userId, setUserId] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [logoClicks, setLogoClicks] = useState(0);
+  // --- 模擬資料庫 State ---
+  const [services, setServices] = useState(INITIAL_SERVICES);
+  const [appointments, setAppointments] = useState(INITIAL_APPOINTMENTS);
+  const [availability, setAvailability] = useState(INITIAL_AVAILABILITY);
 
-  // 導覽分頁：'book' (我要預約) | 'my' (我的預約) | 'admin' (後台管理)
-  const [activeTab, setActiveTab] = useState('book');
+  // --- 視圖與權限 State ---
+  const [activeView, setActiveView] = useState('customer'); // 'customer' | 'admin'
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [adminPinInput, setAdminPinInput] = useState('');
+  const [adminTab, setAdminTab] = useState('appointments'); // 'appointments' | 'schedule' | 'services'
 
-  // 系統設定與預約紀錄
-  const [config, setConfig] = useState(DEFAULT_CONFIG);
-  const [bookedSlotsMap, setBookedSlotsMap] = useState({}); // { '2026-11-20': ['10:00'] }
-  const [myBookings, setMyBookings] = useState([]);
-  const [loadingConfig, setLoadingConfig] = useState(true);
+  // --- LINE LIFF 模擬 Profile 與訊息紀錄 ---
+  const [liffProfile, setLiffProfile] = useState({
+    userId: 'U99x8y7z6w5v4u3t2s1r0',
+    displayName: '林宥嘉 (LIFF 訪客)',
+    isLoggedIn: true
+  });
+  const [lineLogs, setLineLogs] = useState([]);
+  const [toast, setToast] = useState(null);
 
-  // 月曆狀態 (預設顯示 2026 年 11 月或當月)
-  const today = new Date();
-  const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed
-
-  // 客戶表單選擇狀態
-  const [selectedDate, setSelectedDate] = useState('');
+  // --- 客戶端預約表單 State ---
+  const [customerName, setCustomerName] = useState(liffProfile.displayName);
+  const [phone, setPhone] = useState('0918-520-319');
+  const [selectedServiceId, setSelectedServiceId] = useState(INITIAL_SERVICES[0].id);
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [selectedDate, setSelectedDate] = useState(getFutureDateStr(1));
   const [selectedTime, setSelectedTime] = useState('');
-  const [selectedServices, setSelectedServices] = useState([]);
-  const [phone, setPhone] = useState('');
   const [remark, setRemark] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
 
-  // 後台管理編輯狀態
-  const [adminEditDate, setAdminEditDate] = useState('');
-  const [newServiceName, setNewServiceName] = useState('');
-  const [newServicePrice, setNewServicePrice] = useState('');
-  const [savingAdmin, setSavingAdmin] = useState(false);
+  // --- 後台排班與服務編輯 State ---
+  const [scheduleDate, setScheduleDate] = useState(getFutureDateStr(1));
+  const [editingService, setEditingService] = useState(null);
+  const [newServiceForm, setNewServiceForm] = useState({ name: '', price: '', duration: 60, desc: '' });
 
-  // 1. 初始化 LIFF 並從 GAS 讀取後台設定與已預約時段
-  useEffect(() => {
-    const initApp = async () => {
-      try {
-        if (!window.liff) {
-          await new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-          });
-        }
-        await window.liff.init({ liffId: LIFF_ID });
-        if (window.liff.isLoggedIn()) {
-          const profile = await window.liff.getProfile();
-          setUserName(profile.displayName);
-          setUserId(profile.userId);
-          if (profile.userId === ADMIN_USER_ID) {
-            setIsAdmin(true);
-          }
-        } else {
-          window.liff.login();
-        }
-      } catch (err) {
-        console.error('LIFF 初始化失敗:', err);
-      }
+  // 顯示通知 Toast
+  const showToast = (title, message, type = 'info') => {
+    setToast({ title, message, type, id: Date.now() });
+    setTimeout(() => {
+      setToast((prev) => (prev && prev.title === title ? null : prev));
+    }, 4500);
+  };
 
-      // 讀取本地或雲端設定
-      const savedLocal = localStorage.getItem('hair_island_config');
-      if (savedLocal) {
-        try { setConfig(JSON.parse(savedLocal)); } catch (e) {}
-      }
-      const savedMyBookings = localStorage.getItem('hair_island_my_bookings');
-      if (savedMyBookings) {
-        try { setMyBookings(JSON.parse(savedMyBookings)); } catch (e) {}
-      }
-
-      try {
-        const res = await fetch(`${GAS_URL}?action=getInitData`);
-        const data = await res.json();
-        if (data && data.config) {
-          setConfig(data.config);
-          localStorage.setItem('hair_island_config', JSON.stringify(data.config));
-        }
-        if (data && data.bookedSlots) {
-          setBookedSlotsMap(data.bookedSlots);
-        }
-      } catch (err) {
-        console.log('使用預設或本地設定檔');
-      } finally {
-        setLoadingConfig(false);
-      }
+  // ==========================================
+  // 3. LINE LIFF & Messaging API 模擬串接函式
+  // ==========================================
+  const initLiff = () => {
+    const mockProfile = {
+      userId: 'U99x8y7z6w5v4u3t2s1r0',
+      displayName: '蘇郁婷',
+      isLoggedIn: true
     };
-
-    initApp();
-  }, []);
-
-  // 連點 5 下 Logo 可開啟管理員模式（方便在電腦上測試後台）
-  const handleLogoClick = () => {
-    const next = logoClicks + 1;
-    setLogoClicks(next);
-    if (next >= 5) {
-      setIsAdmin(true);
-      setActiveTab('admin');
-      setLogoClicks(0);
-    }
+    setLiffProfile(mockProfile);
+    setCustomerName(mockProfile.displayName);
+    showToast('LINE LIFF 已同步', `成功載入 LINE 帳號：${mockProfile.displayName}`, 'line');
   };
 
-  // 計算某個日期的狀態與剩餘可用時段
-  const getDateStatusAndSlots = (dateStr) => {
-    const override = config.dateOverrides?.[dateStr];
-    const booked = bookedSlotsMap[dateStr] || [];
-
-    if (override?.status === 'closed') {
-      return { status: 'closed', availableSlots: [] };
-    }
-    if (override?.status === 'full') {
-      return { status: 'full', availableSlots: [] };
-    }
-
-    const baseSlots = override?.status === 'open' && override.slots
-      ? override.slots
-      : config.defaultSlots;
-
-    const availableSlots = baseSlots.filter((s) => !booked.includes(s));
-
-    if (availableSlots.length === 0) {
-      return { status: 'full', availableSlots: [] };
-    }
-    return { status: 'available', availableSlots };
+  const sendBookingPendingMsg = (appt, srv) => {
+    const msg = {
+      id: `msg-${Date.now()}`,
+      type: 'LIFF SendMessages (待確認通知)',
+      to: `${appt.customerName} (${appt.liffUserId.slice(0, 8)}...)`,
+      time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
+      content: `【髮嶼 Hair Island｜預約待確認】\n親愛的 ${appt.customerName} 您好，已收到您的預約申請：\n・服務：${srv.name}\n・日期：${appt.date}\n・時段：${appt.time} - ${appt.endTime}\n設計師確認行程後，將透過 LINE 發送正式預約成功通知。`
+    };
+    setLineLogs((prev) => [msg, ...prev]);
+    showToast('LINE 通知已發送', `已向 ${appt.customerName} 發送「預約待確認」訊息`, 'line');
   };
 
-  // 產生月曆格子
-  const generateCalendarDays = () => {
-    const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const sendBookingConfirmedMsg = (appt, srv) => {
+    const msg = {
+      id: `msg-${Date.now()}`,
+      type: 'Messaging API Push (預約已確認)',
+      to: `${appt.customerName} (${appt.liffUserId.slice(0, 8)}...)`,
+      time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
+      content: `【髮嶼 Hair Island｜預約已確認】\n親愛的 ${appt.customerName} 您好，您的預約已為您保留：\n・服務：${srv.name} (NT$${srv.price})\n・時間：${appt.date} ${appt.time} - ${appt.endTime}\n期待您的蒞臨，享受專屬的島嶼放鬆時光。`
+    };
+    setLineLogs((prev) => [msg, ...prev]);
+    showToast('LINE 預約確認已推播', `已透過 Webhook 通知 ${appt.customerName} 預約成功`, 'line');
+  };
+
+  const sendReminderMsg = (appt, srv) => {
+    const msg = {
+      id: `msg-${Date.now()}`,
+      type: 'Messaging API Push (前一日提醒)',
+      to: `${appt.customerName} (${appt.liffUserId.slice(0, 8)}...)`,
+      time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
+      content: `【髮嶼 Hair Island｜明日預約溫馨提醒】\n親愛的 ${appt.customerName} 您好，提醒您明日 (${appt.date}) ${appt.time} 預約了「${srv.name}」。\n若需微調時間請提前告知，我們明日見！`
+    };
+    setLineLogs((prev) => [msg, ...prev]);
+    showToast('LINE 明日提醒已發送', `已向 ${appt.customerName} 發送前一日溫馨提醒`, 'line');
+  };
+
+  // ==========================================
+  // 4. 時段可用性與防撞單核心邏輯
+  // ==========================================
+  const selectedService = useMemo(
+    () => services.find((s) => s.id === selectedServiceId) || services[0],
+    [services, selectedServiceId]
+  );
+
+  // 取得特定日期的所有不可用時段（合併 Availability.blockedSlots 與已確認訂單的佔用時段）
+  const getCombinedBlockedSlotsForDate = (dateStr) => {
+    const availDoc = availability.find((a) => a.date === dateStr);
+    const manualBlocked = availDoc ? availDoc.blockedSlots : [];
+
+    // 找出該日所有 status === 'confirmed' 的訂單，確保即使未同步寫入 blockedSlots 也能嚴密防護
+    const confirmedAppts = appointments.filter(
+      (apt) => apt.date === dateStr && apt.status === 'confirmed'
+    );
+
+    const apptBlocked = [];
+    confirmedAppts.forEach((apt) => {
+      const srv = services.find((s) => s.id === apt.serviceId);
+      const duration = srv ? srv.duration : 60;
+      const slots = expandRequiredSlots(apt.time, duration);
+      apptBlocked.push(...slots);
+    });
+
+    return Array.from(new Set([...manualBlocked, ...apptBlocked]));
+  };
+
+  // 判斷單一日期與單一起始時間，是否足夠容納指定時長 (且不跨越 19:00)
+  const checkSlotBookable = (dateStr, startTime, durationMinutes) => {
+    const startMins = timeToMins(startTime);
+    const endMins = startMins + durationMinutes;
+    if (endMins > 19 * 60) return { ok: false, reason: '逾打烊時間 (19:00)' };
+
+    const blocked = getCombinedBlockedSlotsForDate(dateStr);
+    const neededSlots = expandRequiredSlots(startTime, durationMinutes);
+
+    for (const s of neededSlots) {
+      if (blocked.includes(s)) {
+        return { ok: false, reason: '時段衝突或已滿' };
+      }
+    }
+    return { ok: true, reason: '可預約' };
+  };
+
+  // 判斷某日期在 11:00-19:00 之間是否至少還有一個時段可容納當前選擇的服務
+  const checkDateHasAnySlot = (dateStr, durationMinutes) => {
+    return ALL_DAILY_SLOTS.some((slot) => checkSlotBookable(dateStr, slot, durationMinutes).ok);
+  };
+
+  // 產生月曆格子資料
+  const calendarDays = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDayOfWeek = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const todayStr = getTodayStr();
+
     const days = [];
-
-    for (let i = 0; i < firstDayOfMonth; i++) {
+    for (let i = 0; i < firstDayOfWeek; i++) {
       days.push(null);
     }
     for (let d = 1; d <= daysInMonth; d++) {
-      const mStr = String(currentMonth + 1).padStart(2, '0');
-      const dStr = String(d).padStart(2, '0');
-      const dateStr = `${currentYear}-${mStr}-${dStr}`;
-
-      const dateObj = new Date(currentYear, currentMonth, d, 23, 59, 59);
-      const isPast = dateObj < new Date();
-
-      const { status, availableSlots } = getDateStatusAndSlots(dateStr);
-      days.push({ day: d, dateStr, isPast, status, availableSlots });
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isPast = dateStr < todayStr;
+      const hasAvailableSlot = !isPast && checkDateHasAnySlot(dateStr, selectedService.duration);
+      days.push({
+        dayNumber: d,
+        dateStr,
+        isPast,
+        hasAvailableSlot
+      });
     }
     return days;
-  };
+  }, [currentMonth, selectedService, availability, appointments]);
 
-  const handlePrevMonth = () => {
-    if (currentMonth === 0) {
-      setCurrentYear(currentYear - 1);
-      setCurrentMonth(11);
-    } else {
-      setCurrentMonth(currentMonth - 1);
-    }
-  };
+  // 驗證台灣手機格式 (支援 09xx-xxx-xxx 或 09xxxxxxxx)
+  const isPhoneValid = /^09\d{2}-?\d{3}-?\d{3}$/.test(phone.trim());
 
-  const handleNextMonth = () => {
-    if (currentMonth === 11) {
-      setCurrentYear(currentYear + 1);
-      setCurrentMonth(0);
-    } else {
-      setCurrentMonth(currentMonth + 1);
-    }
-  };
-
-  const toggleService = (serviceName) => {
-    if (selectedServices.includes(serviceName)) {
-      setSelectedServices(selectedServices.filter((s) => s !== serviceName));
-    } else {
-      setSelectedServices([...selectedServices, serviceName]);
-    }
-  };
-
-  // 送出預約
-  const handleSubmitBooking = async (e) => {
+  // ==========================================
+  // 5. 客戶端送出預約處理 (含 Double Booking 檢核)
+  // ==========================================
+  const handleCustomerSubmit = (e) => {
     e.preventDefault();
+    if (!customerName.trim()) {
+      showToast('欄位未填寫', '請輸入您的姓名', 'error');
+      return;
+    }
+    if (!isPhoneValid) {
+      showToast('電話格式錯誤', '請輸入正確的手機號碼格式（例如：0912-345-678）', 'error');
+      return;
+    }
     if (!selectedDate || !selectedTime) {
-      alert('請先點選月曆選擇預約日期與時段！');
-      return;
-    }
-    if (selectedServices.length === 0) {
-      alert('請至少勾選一項服務！');
-      return;
-    }
-    if (!userName.trim()) {
-      alert('請填寫您的姓名！');
-      return;
-    }
-    if (!phone.trim()) {
-      alert('請填寫您的聯絡電話！');
+      showToast('未選擇時段', '請先點選欲預約的日期與時間', 'error');
       return;
     }
 
-    setIsSubmitting(true);
-    const serviceStr = selectedServices.join('、');
-    const finalRemark = remark.trim() || '無';
+    // Double Booking 即時檢核
+    const check = checkSlotBookable(selectedDate, selectedTime, selectedService.duration);
+    if (!check.ok) {
+      showToast('時段已被佔用', `無法預約：${check.reason}，請重新選擇其他時段。`, 'error');
+      setSelectedTime('');
+      return;
+    }
 
-    const newBookingRecord = {
-      id: Date.now(),
-      clientName: userName,
-      userId: userId,
-      phone: phone,
-      serviceItem: serviceStr,
-      appointmentDate: selectedDate,
-      appointmentTime: selectedTime,
-      remark: finalRemark
+    const endMins = timeToMins(selectedTime) + selectedService.duration;
+    const endTime = minsToTime(endMins);
+
+    const newAppt = {
+      id: `apt-${Date.now().toString().slice(-4)}`,
+      liffUserId: liffProfile.userId,
+      customerName: customerName.trim(),
+      phone: phone.trim(),
+      serviceId: selectedService.id,
+      date: selectedDate,
+      time: selectedTime,
+      endTime,
+      status: 'pending',
+      remark: remark.trim()
     };
 
-    // 1. 傳送至 GAS 後端紀錄並推播通知管理員
-    try {
-      await fetch(GAS_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'createBooking',
-          ...newBookingRecord,
-          fullTimeText: `${selectedDate} ${selectedTime}`
-        })
-      });
-    } catch (err) {
-      console.error('傳送 GAS 失敗:', err);
-    }
-
-    // 2. 若在 LINE 內開啟，自動將預約明細傳回官方帳號聊天室
-    if (window.liff && window.liff.isInClient()) {
-      try {
-        await window.liff.sendMessages([
-          {
-            type: 'text',
-            text: `✨【髮嶼 HAIR ISLAND 預約成功】✨\n👤 姓名：${userName}\n📞 電話：${phone}\n📅 日期：${selectedDate}\n⏰ 時間：${selectedTime}\n💇 服務：${serviceStr}\n💬 備註：${finalRemark}`
-          }
-        ]);
-      } catch (err) {
-        console.log('LIFF 傳訊略過:', err);
-      }
-    }
-
-    // 3. 更新本地已預約時段與「我的預約」列表
-    const updatedBooked = {
-      ...bookedSlotsMap,
-      [selectedDate]: [...(bookedSlotsMap[selectedDate] || []), selectedTime]
-    };
-    setBookedSlotsMap(updatedBooked);
-
-    const updatedMy = [newBookingRecord, ...myBookings];
-    setMyBookings(updatedMy);
-    localStorage.setItem('hair_island_my_bookings', JSON.stringify(updatedMy));
-
-    setIsSubmitting(false);
+    setAppointments((prev) => [...prev, newAppt]);
+    sendBookingPendingMsg(newAppt, selectedService);
+    setBookingSuccessModal({ appt: newAppt, service: selectedService });
     setSelectedTime('');
-    setSelectedServices([]);
     setRemark('');
-    setActiveTab('my');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // ================= 後台管理儲存函式 =================
-  const handleSaveConfig = async (newConfig) => {
-    setSavingAdmin(true);
-    setConfig(newConfig);
-    localStorage.setItem('hair_island_config', JSON.stringify(newConfig));
-    try {
-      await fetch(GAS_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'saveConfig',
-          config: newConfig
-        })
-      });
-      alert('✅ 設定已成功儲存並同步更新！');
-    } catch (e) {
-      alert('已儲存在本機！');
+  // ==========================================
+  // 6. 設計師後台管理操作處理
+  // ==========================================
+  // 確認訂單 -> 將所需時長寫入 Availability.blockedSlots 並發送 LINE 確認通知
+  const handleConfirmAppointment = (appt) => {
+    const srv = services.find((s) => s.id === appt.serviceId) || { name: '美髮服務', duration: 60, price: 0 };
+    const slotsToLock = expandRequiredSlots(appt.time, srv.duration);
+
+    // 確認前再次檢查是否與已鎖定時段衝突
+    const currentBlocked = getCombinedBlockedSlotsForDate(appt.date);
+    const conflict = slotsToLock.some((s) => currentBlocked.includes(s));
+    if (conflict) {
+      showToast('時段衝突警告', `該時段 (${appt.time}-${appt.endTime}) 與現有排程或店休重疊，請先協調或調整時段！`, 'error');
+      return;
     }
-    setSavingAdmin(false);
-  };
 
-  const setDateOverrideStatus = (dateStr, status) => {
-    const prev = config.dateOverrides?.[dateStr] || { slots: [...config.defaultSlots] };
-    const updated = {
-      ...config,
-      dateOverrides: {
-        ...config.dateOverrides,
-        [dateStr]: { ...prev, status, slots: prev.slots?.length ? prev.slots : [...config.defaultSlots] }
+    // 1. 更新訂單狀態為 confirmed
+    setAppointments((prev) =>
+      prev.map((item) => (item.id === appt.id ? { ...item, status: 'confirmed' } : item))
+    );
+
+    // 2. 將時段轉化為 blockedSlots 寫入 Availability
+    setAvailability((prev) => {
+      const existing = prev.find((a) => a.date === appt.date);
+      if (existing) {
+        const merged = Array.from(new Set([...existing.blockedSlots, ...slotsToLock])).sort();
+        return prev.map((a) => (a.date === appt.date ? { ...a, blockedSlots: merged } : a));
+      } else {
+        return [...prev, { date: appt.date, blockedSlots: slotsToLock }];
       }
-    };
-    setConfig(updated);
+    });
+
+    // 3. 觸發 LINE Messaging API 發送確認訊息
+    sendBookingConfirmedMsg(appt, srv);
   };
 
-  const toggleDateSlot = (dateStr, slot) => {
-    const prev = config.dateOverrides?.[dateStr] || { status: 'open', slots: [...config.defaultSlots] };
-    const currentSlots = prev.slots || [...config.defaultSlots];
-    const nextSlots = currentSlots.includes(slot)
-      ? currentSlots.filter((s) => s !== slot)
-      : [...currentSlots, slot].sort();
+  const handleUpdateApptStatus = (apptId, newStatus) => {
+    setAppointments((prev) =>
+      prev.map((item) => (item.id === apptId ? { ...item, status: newStatus } : item))
+    );
+    showToast('訂單狀態已更新', `訂單 #${apptId} 已變更為 ${newStatus}`, 'info');
+  };
 
-    const updated = {
-      ...config,
-      dateOverrides: {
-        ...config.dateOverrides,
-        [dateStr]: { status: 'open', slots: nextSlots }
+  // 後台 Tab 2：手動切換單一 30 分鐘時段的「店休/開放」
+  const toggleManualBlockSlot = (dateStr, slotStr) => {
+    setAvailability((prev) => {
+      const existing = prev.find((a) => a.date === dateStr);
+      if (existing) {
+        const exists = existing.blockedSlots.includes(slotStr);
+        const updatedSlots = exists
+          ? existing.blockedSlots.filter((s) => s !== slotStr)
+          : [...existing.blockedSlots, slotStr].sort();
+        return prev.map((a) => (a.date === dateStr ? { ...a, blockedSlots: updatedSlots } : a));
+      } else {
+        return [...prev, { date: dateStr, blockedSlots: [slotStr] }];
       }
-    };
-    setConfig(updated);
+    });
   };
 
-  const calendarDays = generateCalendarDays();
-  const currentSelectedDateInfo = selectedDate ? getDateStatusAndSlots(selectedDate) : null;
+  // 後台 Tab 2：一鍵設定整日店休或全開
+  const toggleWholeDayOff = (dateStr, lockAll) => {
+    setAvailability((prev) => {
+      const existing = prev.find((a) => a.date === dateStr);
+      const targetSlots = lockAll ? [...ALL_DAILY_SLOTS] : [];
+      if (existing) {
+        return prev.map((a) => (a.date === dateStr ? { ...a, blockedSlots: targetSlots } : a));
+      } else {
+        return [...prev, { date: dateStr, blockedSlots: targetSlots }];
+      }
+    });
+    showToast(
+      lockAll ? '已設為全日店休' : '已解除全日店休',
+      `${dateStr} 時段狀態已更新`,
+      'info'
+    );
+  };
 
-  // 所有可選的半小時時段池（供後台勾選開放時段）
-  const allHalfHourPool = [
-    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-    '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
-    '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'
-  ];
+  // 後台 Tab 3：新增或儲存服務項目
+  const handleSaveService = (e) => {
+    e.preventDefault();
+    if (!newServiceForm.name.trim() || !newServiceForm.price) return;
 
+    if (editingService) {
+      setServices((prev) =>
+        prev.map((s) =>
+          s.id === editingService.id
+            ? {
+                ...s,
+                name: newServiceForm.name.trim(),
+                price: Number(newServiceForm.price),
+                duration: Number(newServiceForm.duration),
+                desc: newServiceForm.desc.trim()
+              }
+            : s
+        )
+      );
+      setEditingService(null);
+      showToast('服務項目已更新', `已儲存「${newServiceForm.name}」的設定`, 'info');
+    } else {
+      const created = {
+        id: `srv-${Date.now().toString().slice(-4)}`,
+        name: newServiceForm.name.trim(),
+        price: Number(newServiceForm.price),
+        duration: Number(newServiceForm.duration),
+        desc: newServiceForm.desc.trim() || '專屬客製化美髮與頭皮養護服務'
+      };
+      setServices((prev) => [...prev, created]);
+      showToast('新增服務成功', `已新增「${created.name}」`, 'info');
+    }
+    setNewServiceForm({ name: '', price: '', duration: 60, desc: '' });
+  };
+
+  const handleDeleteService = (srvId) => {
+    if (services.length <= 1) {
+      showToast('無法刪除', '系統至少需保留一項服務項目', 'error');
+      return;
+    }
+    setServices((prev) => prev.filter((s) => s.id !== srvId));
+    if (selectedServiceId === srvId) {
+      const remaining = services.filter((s) => s.id !== srvId);
+      if (remaining[0]) setSelectedServiceId(remaining[0].id);
+    }
+    showToast('已刪除服務', '該服務項目已從資料庫移除', 'info');
+  };
+
+  // ==========================================
+  // 7. 視覺渲染 (極簡胡桃木質調風格)
+  // ==========================================
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f6efea', color: '#2c2523', fontFamily: '-apple-system, BlinkMacSystemFont, "Noto Sans TC", "Segoe UI", sans-serif', paddingBottom: '60px', boxSizing: 'border-box' }}>
-      <style>{`
-        * { box-sizing: border-box; }
-        body { margin: 0; background-color: #f6efea; }
-        input, textarea, button { font-family: inherit; }
-      `}</style>
-
-      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 18px' }}>
-        
-        {/* 頂部 Header：品牌 Logo 與 雙分頁切換器 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
-          <div onClick={handleLogoClick} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#fff', border: '1px solid #e5dcd6', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
-              <span style={{ fontSize: '15px', fontWeight: '700', color: '#9e8576', letterSpacing: '1px', lineHeight: '1.1' }}>HI</span>
-              <span style={{ fontSize: '8px', color: '#b5a195', transform: 'scale(0.85)' }}>HAIR ISLAND</span>
-            </div>
-            <span style={{ fontSize: '19px', fontWeight: '700', color: '#2c2523', letterSpacing: '0.5px' }}>髮嶼</span>
+    <div className="min-h-screen bg-[#F7F4EF] text-[#2C2520] font-sans selection:bg-[#6E5039] selection:text-white pb-16">
+      {/* 頂部導覽切換列 (方便預覽切換 Client / Admin 與檢視 LINE Webhook 紀錄) */}
+      <div className="sticky top-0 z-40 bg-[#2C2520] text-[#EBE5DC] px-4 py-2.5 shadow-md border-b border-[#4A3C31]">
+        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#38B449] animate-pulse" />
+            <span className="text-xs tracking-widest uppercase text-[#C8B9A6]">
+              HAIR ISLAND SALON · SPA & LIFF SYSTEM
+            </span>
           </div>
 
-          <div style={{ display: 'flex', backgroundColor: '#ebe3dd', padding: '4px', borderRadius: '30px', gap: '2px' }}>
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setActiveTab('book')}
-              style={{
-                border: 'none',
-                backgroundColor: activeTab === 'book' ? '#ffffff' : 'transparent',
-                color: activeTab === 'book' ? '#2c2523' : '#8c827c',
-                padding: '8px 16px',
-                borderRadius: '24px',
-                fontSize: '13px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: activeTab === 'book' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                transition: 'all 0.2s'
-              }}
+              onClick={() => setActiveView('customer')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                activeView === 'customer'
+                  ? 'bg-[#C8B9A6] text-[#2C2520] shadow-sm'
+                  : 'text-[#C8B9A6] hover:bg-[#3E342D]'
+              }`}
             >
-              我要預約
+              客戶端預約介面 (LIFF View)
             </button>
             <button
-              onClick={() => setActiveTab('my')}
-              style={{
-                border: 'none',
-                backgroundColor: activeTab === 'my' ? '#ffffff' : 'transparent',
-                color: activeTab === 'my' ? '#2c2523' : '#8c827c',
-                padding: '8px 16px',
-                borderRadius: '24px',
-                fontSize: '13px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: activeTab === 'my' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                transition: 'all 0.2s'
-              }}
+              onClick={() => setActiveView('admin')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                activeView === 'admin'
+                  ? 'bg-[#C8B9A6] text-[#2C2520] shadow-sm'
+                  : 'text-[#C8B9A6] hover:bg-[#3E342D]'
+              }`}
             >
-              我的預約
+              <ShieldCheck className="w-3.5 h-3.5" />
+              設計師後台管理 (Admin)
             </button>
-            {isAdmin && (
-              <button
-                onClick={() => setActiveTab('admin')}
-                style={{
-                  border: 'none',
-                  backgroundColor: activeTab === 'admin' ? '#2c2523' : 'transparent',
-                  color: activeTab === 'admin' ? '#ffffff' : '#8c827c',
-                  padding: '8px 12px',
-                  borderRadius: '24px',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                ⚙️ 後台
-              </button>
-            )}
           </div>
         </div>
+      </div>
 
-        {/* ==================== 分頁 1：我要預約 ==================== */}
-        {activeTab === 'book' && (
-          <>
-            {/* 主視覺標語區 */}
-            <div style={{ marginBottom: '24px', paddingLeft: '4px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#b56c75', letterSpacing: '1.8px', marginBottom: '8px' }}>
-                {config.brandSub}
+      {/* 頂部動態通知 Toast */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-[#2C2520] text-[#F7F4EF] border border-[#6E5039] rounded-2xl p-4 shadow-2xl transition-all duration-300">
+          <div className="flex items-start gap-3">
+            {toast.type === 'line' ? (
+              <div className="w-8 h-8 rounded-xl bg-[#06C755] flex items-center justify-center shrink-0 text-white font-bold text-xs">
+                LINE
               </div>
-              <h1 style={{ fontSize: '30px', fontWeight: '800', color: '#261f1d', margin: '0 0 12px 0', lineHeight: '1.35', letterSpacing: '0.5px' }}>
-                {config.heroTitle1}<br />
-                {config.heroTitle2}
-              </h1>
-              <p style={{ fontSize: '14px', color: '#7d736e', margin: '0 0 18px 0' }}>
-                {config.heroDesc}
-              </p>
-
-              {/* 社群圓形按鈕 (IG / FB / LINE) */}
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <a href={config.igUrl} target="_blank" rel="noreferrer" style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: '#ffffff', border: '1px solid #e6ded8', display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none', color: '#5c524d', fontSize: '15px', fontWeight: '700', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
-                  IG
-                </a>
-                <a href={config.fbUrl} target="_blank" rel="noreferrer" style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: '#ffffff', border: '1px solid #e6ded8', display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none', color: '#5c524d', fontSize: '16px', fontWeight: '700', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
-                  f
-                </a>
-                <a href={config.lineUrl} target="_blank" rel="noreferrer" style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: '#ffffff', border: '1px solid #e6ded8', display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none', color: '#5c524d', fontSize: '11px', fontWeight: '800', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
-                  LINE
-                </a>
-              </div>
+            ) : toast.type === 'error' ? (
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-[#C8B9A6] shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 text-xs leading-relaxed">
+              <div className="font-semibold text-sm text-white mb-0.5">{toast.title}</div>
+              <div className="text-[#D5CBBF]">{toast.message}</div>
             </div>
+            <button onClick={() => setToast(null)} className="text-[#9A8C7E] hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
-            {/* 卡片 1：預約須知 */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '22px', padding: '24px 22px', marginBottom: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: '700', margin: 0, color: '#261f1d' }}>預約須知</h2>
-                <span style={{ backgroundColor: '#eaf3f0', color: '#2e6f5e', fontSize: '12px', fontWeight: '600', padding: '5px 12px', borderRadius: '20px' }}>
-                  預約前請詳閱
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '14px', color: '#4a4340', lineHeight: '1.6' }}>
-                {config.notices.map((note, idx) => (
-                  <div key={idx}>・{note}</div>
-                ))}
-              </div>
-            </div>
-
-            {/* 卡片 2：1. 選擇日期 & 2. 選擇時間 */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '22px', padding: '24px 22px', marginBottom: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ fontSize: '18px', fontWeight: '700', margin: 0, color: '#261f1d' }}>1. 選擇日期</h2>
-                <span style={{ backgroundColor: '#eaf3f0', color: '#2e6f5e', fontSize: '12px', fontWeight: '600', padding: '5px 12px', borderRadius: '20px' }}>
-                  {selectedDate ? `已選 ${selectedDate}` : '請選擇日期'}
-                </span>
-              </div>
-
-              {/* 月份切換器 */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '0 8px' }}>
-                <button
-                  type="button"
-                  onClick={handlePrevMonth}
-                  style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #e6ded8', backgroundColor: '#fff', color: '#8c827c', fontSize: '16px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
-                >
-                  ‹
-                </button>
-                <div style={{ fontSize: '18px', fontWeight: '700', color: '#261f1d', letterSpacing: '1px' }}>
-                  {currentYear} 年 {currentMonth + 1} 月
+      {/* =====================================================
+          VIEW 1: 客戶端預約介面 (Customer Booking)
+      ===================================================== */}
+      {activeView === 'customer' && (
+        <div className="max-w-3xl mx-auto px-4 pt-8">
+          {/* 極簡木質調品牌 Header */}
+          <header className="bg-[#EFECE6] border border-[#DFD8CE] rounded-3xl p-8 md:p-10 mb-8 relative overflow-hidden shadow-sm">
+            <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
+              <div className="text-center md:text-left">
+                {/* 極簡線條品牌 Logo (結合太陽、椰樹、海鷗、波浪髮絲與美髮剪刀意象) */}
+                <div className="inline-flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 rounded-2xl bg-[#2C2520] text-[#EBE5DC] flex items-center justify-center shadow-md border border-[#5A4635]">
+                    <svg viewBox="0 0 64 64" className="w-11 h-11 stroke-current fill-none" strokeWidth="1.8">
+                      {/* 太陽與海鷗 */}
+                      <circle cx="22" cy="20" r="6" />
+                      <path d="M38 16 Q42 12 46 16 Q50 12 54 16" strokeLinecap="round" />
+                      {/* 椰樹與流線髮絲波浪 */}
+                      <path d="M12 44 Q28 34 48 44" strokeLinecap="round" />
+                      <path d="M10 51 Q30 41 52 51" strokeLinecap="round" />
+                      {/* 隱藏剪刀流線符號 */}
+                      <circle cx="46" cy="30" r="3" />
+                      <path d="M43 28 L33 22 M43 32 L33 36" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-serif tracking-[0.2em] text-[#2C2520] font-semibold">
+                      髮嶼
+                    </h1>
+                    <p className="text-xs tracking-[0.28em] text-[#7A6855] uppercase mt-1">
+                      HAIR ISLAND SALON
+                    </p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleNextMonth}
-                  style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #e6ded8', backgroundColor: '#fff', color: '#8c827c', fontSize: '16px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
-                >
-                  ›
-                </button>
+
+                <p className="text-sm text-[#5C4E41] leading-relaxed max-w-lg">
+                  在溫潤胡桃木與靜謐留白之間，為您預留一段不被打擾的島嶼時光。專注於深層頭皮養護與自然鬆弛感髮型設計。
+                </p>
               </div>
 
-              {/* 星期標題 */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', fontSize: '13px', color: '#8c827c', marginBottom: '10px', fontWeight: '500' }}>
-                <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+              {/* LIFF 綁定狀態小卡 */}
+              <div className="bg-[#F7F4EF] border border-[#DFD8CE] rounded-2xl p-4 text-xs w-full md:w-60 shrink-0">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-[#5C4E41] flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#06C755]" />
+                    LINE LIFF 已連線
+                  </span>
+                  <button
+                    type="button"
+                    onClick={initLiff}
+                    className="text-[11px] text-[#6E5039] underline hover:text-[#2C2520]"
+                  >
+                    重新取得 Profile
+                  </button>
+                </div>
+                <div className="text-[#7A6855] truncate">UID: {liffProfile.userId}</div>
+                <div className="text-[#2C2520] font-medium mt-0.5">暱稱：{liffProfile.displayName}</div>
+              </div>
+            </div>
+
+            {/* 預約須知 */}
+            <div className="mt-6 pt-5 border-t border-[#DFD8CE] grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-[#6E5D4F]">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[#6E5039] shrink-0" />
+                <span>營業時間：11:00 - 19:00（全預約制）</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#6E5039] shrink-0" />
+                <span>一對一專屬服務，座位保留 15 分鐘</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-[#6E5039] shrink-0" />
+                <span>送出後將由設計師確認並以 LINE 通知</span>
+              </div>
+            </div>
+          </header>
+
+          {/* 預約四步驟表單 */}
+          <form onSubmit={handleCustomerSubmit} className="space-y-8">
+            {/* STEP 1: 聯絡資訊 */}
+            <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
+              <div className="flex items-center gap-3 mb-5">
+                <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
+                  01
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold tracking-wider text-[#2C2520]">貴賓聯絡資訊</h2>
+                  <p className="text-xs text-[#8A7968]">預設帶入您的 LINE 顯示名稱，可直接修改為真實姓名</p>
+                </div>
               </div>
 
-              {/* 月曆日期網格 */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: '8px', columnGap: '4px', textAlign: 'center', marginBottom: '28px' }}>
-                {calendarDays.map((item, idx) => {
-                  if (!item) return <div key={`empty-${idx}`} />;
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-medium text-[#5C4E41] mb-2">
+                    預約姓名 <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-[#9A8C7E] absolute left-3.5 top-3" />
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="請輸入您的稱呼"
+                      className="w-full pl-10 pr-4 py-2.5 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-sm focus:outline-none focus:border-[#6E5039]"
+                      required
+                    />
+                  </div>
+                </div>
 
-                  const isSelected = selectedDate === item.dateStr;
-                  const isDisabled = item.isPast || item.status === 'closed' || item.status === 'full';
+                <div>
+                  <label className="block text-xs font-medium text-[#5C4E41] mb-2">
+                    聯絡電話 (台灣手機格式) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-[#9A8C7E] absolute left-3.5 top-3" />
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="0912-345-678"
+                      className={`w-full pl-10 pr-4 py-2.5 bg-[#FAF8F5] border rounded-xl text-sm focus:outline-none ${
+                        phone && !isPhoneValid
+                          ? 'border-red-400 focus:border-red-500'
+                          : 'border-[#DCD3C6] focus:border-[#6E5039]'
+                      }`}
+                      required
+                    />
+                  </div>
+                  {phone && !isPhoneValid && (
+                    <p className="text-[11px] text-red-500 mt-1">請輸入正確的 09 開頭十碼手機號碼</p>
+                  )}
+                </div>
+              </div>
+            </section>
 
-                  let bg = 'transparent';
-                  let border = 'none';
-                  let textColor = '#261f1d';
-                  let badgeText = '';
+            {/* STEP 2: 服務選擇 */}
+            <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
+                    02
+                  </span>
+                  <div>
+                    <h2 className="text-base font-semibold tracking-wider text-[#2C2520]">選擇專屬養護或造型項目</h2>
+                    <p className="text-xs text-[#8A7968]">系統將依據您所選服務的預估時長，自動篩選合適的連續空檔</p>
+                  </div>
+                </div>
+              </div>
 
-                  if (item.isPast) {
-                    textColor = '#d0c8c2';
-                  } else if (item.status === 'closed') {
-                    bg = '#f4e6e8';
-                    textColor = '#9e5863';
-                    badgeText = '店休';
-                  } else if (item.status === 'full') {
-                    bg = '#f4e6e8';
-                    textColor = '#9e5863';
-                    badgeText = '額滿';
-                  }
-
-                  if (isSelected) {
-                    bg = '#2c2523';
-                    textColor = '#ffffff';
-                  }
-
+              <div className="grid grid-cols-1 gap-3.5">
+                {services.map((srv) => {
+                  const isSelected = srv.id === selectedServiceId;
                   return (
                     <div
-                      key={item.dateStr}
+                      key={srv.id}
                       onClick={() => {
-                        if (!isDisabled) {
-                          setSelectedDate(item.dateStr);
-                          setSelectedTime('');
-                        }
+                        setSelectedServiceId(srv.id);
+                        setSelectedTime(''); // 切換服務時重設時間以重新檢核時長
                       }}
-                      style={{
-                        height: '52px',
-                        borderRadius: '12px',
-                        backgroundColor: bg,
-                        border: border,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        cursor: isDisabled ? 'default' : 'pointer',
-                        transition: 'all 0.15s'
-                      }}
+                      className={`cursor-pointer rounded-2xl p-4 border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'bg-[#F3EFE6] border-[#6E5039] shadow-sm'
+                          : 'bg-[#FAF8F5] border-[#E6DFD3] hover:border-[#C8B9A6]'
+                      }`}
                     >
-                      <span style={{ fontSize: '15px', fontWeight: isSelected || !isDisabled ? '600' : '400', color: textColor, lineHeight: '1.2' }}>
-                        {item.day}
-                      </span>
-                      {badgeText && (
-                        <span style={{ fontSize: '10px', color: isSelected ? '#fff' : '#9e5863', marginTop: '2px', fontWeight: '600' }}>
-                          {badgeText}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                              isSelected ? 'border-[#6E5039] bg-[#6E5039]' : 'border-[#B0A191]'
+                            }`}
+                          >
+                            {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                          </div>
+                          <span className="font-medium text-sm text-[#2C2520]">{srv.name}</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#E5DEC9] text-[#5C4E41]">
+                            約 {srv.duration} 分鐘
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#7A6855] pl-6">{srv.desc}</p>
+                      </div>
+                      <div className="pl-6 sm:pl-0 text-right shrink-0">
+                        <span className="text-base font-semibold text-[#6E5039]">
+                          NT$ {srv.price.toLocaleString()}
                         </span>
-                      )}
+                      </div>
                     </div>
                   );
                 })}
               </div>
+            </section>
 
-              {/* 2. 選擇時間 */}
-              <h2 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 14px 0', color: '#261f1d' }}>2. 選擇時間</h2>
-              {!selectedDate ? (
-                <div style={{ backgroundColor: '#f5f1ed', borderRadius: '14px', padding: '16px 18px', color: '#8c827c', fontSize: '14px' }}>
-                  點選月曆日期後查看剩餘時段
+            {/* STEP 3: 日期與時間選擇 */}
+            <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
+                  03
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold tracking-wider text-[#2C2520]">選擇預約日期與時段</h2>
+                  <p className="text-xs text-[#8A7968]">
+                    目前選擇：<strong className="text-[#6E5039]">{selectedService.name}</strong>（需保留連續{' '}
+                    <strong className="text-[#6E5039]">{selectedService.duration} 分鐘</strong> 空檔）
+                  </p>
                 </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                  {currentSelectedDateInfo?.availableSlots.map((slot) => {
-                    const active = selectedTime === slot;
+              </div>
+
+              {/* 月曆控制列 */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4 px-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
+                    }
+                    className="p-2 rounded-xl hover:bg-[#EFECE6] text-[#5C4E41]"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <div className="text-sm font-semibold tracking-widest text-[#2C2520]">
+                    {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
+                    }
+                    className="p-2 rounded-xl hover:bg-[#EFECE6] text-[#5C4E41]"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* 星期標題 */}
+                <div className="grid grid-cols-7 gap-1.5 text-center text-xs text-[#8A7968] mb-2">
+                  {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
+                    <div key={d} className="py-1 font-medium">
+                      {d}
+                    </div>
+                  ))}
+                </div>
+
+                {/* 日期網格 */}
+                <div className="grid grid-cols-7 gap-1.5">
+                  {calendarDays.map((cell, idx) => {
+                    if (!cell) return <div key={`empty-${idx}`} className="h-16" />;
+
+                    const isSelected = cell.dateStr === selectedDate;
+                    const disabled = cell.isPast || !cell.hasAvailableSlot;
+
                     return (
                       <button
                         type="button"
-                        key={slot}
-                        onClick={() => setSelectedTime(slot)}
-                        style={{
-                          padding: '12px 0',
-                          borderRadius: '12px',
-                          border: active ? '1px solid #2c2523' : '1px solid #e0d8d0',
-                          backgroundColor: active ? '#2c2523' : '#ffffff',
-                          color: active ? '#ffffff' : '#2c2523',
-                          fontSize: '15px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s'
+                        key={cell.dateStr}
+                        disabled={disabled}
+                        onClick={() => {
+                          setSelectedDate(cell.dateStr);
+                          setSelectedTime('');
                         }}
+                        className={`h-16 rounded-2xl border p-1.5 flex flex-col items-center justify-between transition-all ${
+                          cell.isPast
+                            ? 'bg-[#F2EFE9] border-transparent text-[#BEB5A9] cursor-not-allowed opacity-60'
+                            : !cell.hasAvailableSlot
+                            ? 'bg-[#F5EFEB] border-[#E8DFD7] text-[#B09B8C] cursor-not-allowed'
+                            : isSelected
+                            ? 'bg-[#6E5039] border-[#6E5039] text-white shadow-md'
+                            : 'bg-[#FAF8F5] border-[#E6DFD3] text-[#2C2520] hover:border-[#6E5039]'
+                        }`}
                       >
-                        {slot}
+                        <span className="text-xs font-semibold">{cell.dayNumber}</span>
+                        {!cell.isPast && (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full leading-none ${
+                              !cell.hasAvailableSlot
+                                ? 'bg-[#E5D7CE] text-[#8C6D58]'
+                                : isSelected
+                                ? 'bg-white/20 text-white'
+                                : 'bg-[#E6EFE6] text-[#3B6E4C]'
+                            }`}
+                          >
+                            {cell.hasAvailableSlot ? '可預約' : '已額滿'}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
                 </div>
-              )}
-            </div>
-
-            {/* 卡片 3：3. 預約資料（服務複選＋姓名電話備註） */}
-            <form onSubmit={handleSubmitBooking} style={{ backgroundColor: '#ffffff', borderRadius: '22px', padding: '24px 22px', marginBottom: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-                <h2 style={{ fontSize: '18px', fontWeight: '700', margin: 0, color: '#261f1d' }}>3. 預約資料</h2>
-                <span style={{ backgroundColor: '#eaf3f0', color: '#2e6f5e', fontSize: '12px', fontWeight: '600', padding: '5px 12px', borderRadius: '20px' }}>
-                  服務可複選
-                </span>
               </div>
 
-              {/* 服務項目複選卡片清單 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                {config.services.map((srv) => {
-                  const checked = selectedServices.includes(srv.name);
-                  return (
-                    <div
-                      key={srv.id}
-                      onClick={() => toggleService(srv.name)}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '16px 18px',
-                        borderRadius: '16px',
-                        border: checked ? '1.5px solid #9e5863' : '1px solid #e6ded8',
-                        backgroundColor: checked ? '#fcf8f9' : '#ffffff',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '8px',
-                            border: checked ? 'none' : '1.5px solid #9e948e',
-                            backgroundColor: checked ? '#9e5863' : '#ffffff',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            color: '#ffffff',
-                            fontSize: '14px',
-                            fontWeight: '700'
-                          }}
-                        >
-                          {checked ? '✓' : ''}
-                        </div>
-                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#261f1d' }}>{srv.name}</span>
-                      </div>
-                      <span style={{ fontSize: '15px', fontWeight: '600', color: '#a86470' }}>{srv.price}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* 姓名欄位（自動帶入 LINE 名稱，亦可修改） */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '14px', color: '#7d736e', marginBottom: '8px', fontWeight: '500' }}>姓名</label>
-                <input
-                  type="text"
-                  required
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="您的姓名"
-                  style={{ width: '100%', height: '50px', padding: '0 16px', borderRadius: '14px', border: '1px solid #e6ded8', fontSize: '15px', color: '#261f1d', outline: 'none' }}
-                />
-              </div>
-
-              {/* 電話欄位 */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '14px', color: '#7d736e', marginBottom: '8px', fontWeight: '500' }}>電話</label>
-                <input
-                  type="tel"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="09xx-xxx-xxx"
-                  style={{ width: '100%', height: '50px', padding: '0 16px', borderRadius: '14px', border: '1px solid #e6ded8', fontSize: '15px', color: '#261f1d', outline: 'none' }}
-                />
-              </div>
-
-              {/* 備註欄位 */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '14px', color: '#7d736e', marginBottom: '8px', fontWeight: '500' }}>備註</label>
-                <textarea
-                  rows="3"
-                  value={remark}
-                  onChange={(e) => setRemark(e.target.value)}
-                  placeholder="想做的髮型款式、頭皮狀況或特殊需求等"
-                  style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e6ded8', fontSize: '15px', color: '#261f1d', outline: 'none', resize: 'none' }}
-                />
-              </div>
-
-              {/* 動態狀態提示條 */}
-              <div style={{ backgroundColor: '#f5f1ed', borderRadius: '14px', padding: '14px 18px', marginBottom: '14px', fontSize: '14px', color: '#4a4340', fontWeight: '500' }}>
-                {selectedServices.length === 0
-                  ? '請至少勾選一項服務'
-                  : !selectedDate || !selectedTime
-                  ? `已選 ${selectedServices.length} 項服務，請選擇上方預約日期與時間`
-                  : `預約：${selectedDate} (${selectedTime})・共 ${selectedServices.length} 項服務`}
-              </div>
-
-              {/* 確認預約按鈕 */}
-              <button
-                type="submit"
-                disabled={isSubmitting || selectedServices.length === 0 || !selectedDate || !selectedTime}
-                style={{
-                  width: '100%',
-                  height: '52px',
-                  borderRadius: '14px',
-                  border: 'none',
-                  backgroundColor: (selectedServices.length === 0 || !selectedDate || !selectedTime) ? '#96938f' : '#2c2523',
-                  color: '#ffffff',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  letterSpacing: '1px',
-                  cursor: (selectedServices.length === 0 || !selectedDate || !selectedTime) ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {isSubmitting ? '預約傳送中...' : '確認預約'}
-              </button>
-            </form>
-
-            {/* 卡片 4：LOCATION 店鋪位置與 Google 地圖 */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '22px', padding: '24px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#b56c75', letterSpacing: '1.5px', marginBottom: '6px' }}>
-                LOCATION
-              </div>
-              <h2 style={{ fontSize: '22px', fontWeight: '700', margin: '0 0 12px 0', color: '#261f1d' }}>
-                {config.locationName}
-              </h2>
-              <div style={{ fontSize: '15px', color: '#6e655f', lineHeight: '1.6', marginBottom: '16px' }}>
-                <div>{config.locationAddress}</div>
-                <div>{config.locationNote}</div>
-              </div>
-
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(config.mapQuery)}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: 'inline-block',
-                  backgroundColor: '#221e1d',
-                  color: '#ffffff',
-                  textDecoration: 'none',
-                  padding: '10px 20px',
-                  borderRadius: '24px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  marginBottom: '18px'
-                }}
-              >
-                開啟 Google 地圖
-              </a>
-
-              <div style={{ width: '100%', height: '240px', borderRadius: '16px', overflow: 'hidden', border: '1px solid #e6ded8' }}>
-                <iframe
-                  title="salon-map"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  allowFullScreen
-                  src={`https://maps.google.com/maps?q=${encodeURIComponent(config.mapQuery)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
-                />
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ==================== 分頁 2：我的預約 ==================== */}
-        {activeTab === 'my' && (
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '22px', padding: '28px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: '700', margin: '0 0 8px 0', color: '#261f1d' }}>
-              我的預約紀錄
-            </h2>
-            <p style={{ fontSize: '13px', color: '#8c827c', margin: '0 0 20px 0' }}>
-              {userName ? `貴賓 ${userName} 您好，以下為您的預約資訊：` : '以下為您近期的預約申請紀錄：'}
-            </p>
-
-            {myBookings.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', backgroundColor: '#faf7f5', borderRadius: '16px', color: '#8c827c', fontSize: '14px' }}>
-                目前尚無預約紀錄
-                <div style={{ marginTop: '16px' }}>
-                  <button
-                    onClick={() => setActiveTab('book')}
-                    style={{ backgroundColor: '#2c2523', color: '#fff', border: 'none', padding: '10px 22px', borderRadius: '20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-                  >
-                    前往立即預約
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {myBookings.map((item) => (
-                  <div key={item.id} style={{ padding: '18px', borderRadius: '16px', backgroundColor: '#faf7f5', border: '1px solid #ebe3dd', lineHeight: '1.8', fontSize: '14px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontWeight: '700', fontSize: '16px', color: '#2c2523' }}>📅 {item.appointmentDate} ({item.appointmentTime})</span>
-                      <span style={{ backgroundColor: '#eaf3f0', color: '#2e6f5e', fontSize: '11px', fontWeight: '600', padding: '3px 10px', borderRadius: '12px' }}>已送出預約</span>
-                    </div>
-                    <div>💇 預約服務：<strong>{item.serviceItem}</strong></div>
-                    <div>👤 預約姓名：{item.clientName} ({item.phone})</div>
-                    <div>💬 備註事項：{item.remark}</div>
+              {/* 11:00 ~ 19:00 時段按鈕區 (每 30 分鐘一區間) */}
+              {selectedDate && (
+                <div className="pt-5 border-t border-[#ECE6DA]">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <span className="text-xs font-medium text-[#5C4E41]">
+                      選擇起始時間（{selectedDate} 營業時段 11:00 - 19:00）
+                    </span>
+                    <span className="text-[11px] text-[#8A7968]">
+                      反灰代表已預約、店休，或剩餘連續時間不足 {selectedService.duration} 分鐘
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* ==================== 分頁 3：管理員專屬後台設定 ==================== */}
-        {activeTab === 'admin' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            {/* 區塊 A：單日排班與空檔設定 */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '22px', padding: '24px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 6px 0' }}>⚙️ 1. 調整每日營業狀態與空檔時段</h2>
-              <p style={{ fontSize: '13px', color: '#8c827c', margin: '0 0 16px 0' }}>
-                選擇日期後，可將當天設為「店休」、「額滿」，或自由勾選當天有空的時段。
-              </p>
-
-              <input
-                type="date"
-                value={adminEditDate}
-                onChange={(e) => setAdminEditDate(e.target.value)}
-                style={{ width: '100%', height: '46px', padding: '0 14px', borderRadius: '12px', border: '1px solid #dcd6cd', fontSize: '15px', marginBottom: '16px' }}
-              />
-
-              {adminEditDate && (
-                <div style={{ backgroundColor: '#faf7f5', padding: '16px', borderRadius: '14px', border: '1px solid #ebe3dd' }}>
-                  <div style={{ fontWeight: '700', marginBottom: '10px', fontSize: '14px' }}>
-                    設定 {adminEditDate} 狀態：
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                    {[
-                      { key: 'open', label: '正常營業 (自訂空檔)' },
-                      { key: 'full', label: '標示額滿' },
-                      { key: 'closed', label: '標示店休' }
-                    ].map((st) => {
-                      const currentSt = config.dateOverrides?.[adminEditDate]?.status || 'open';
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+                    {ALL_DAILY_SLOTS.map((slot) => {
+                      const check = checkSlotBookable(selectedDate, slot, selectedService.duration);
+                      const isSelected = selectedTime === slot;
                       return (
                         <button
-                          key={st.key}
                           type="button"
-                          onClick={() => setDateOverrideStatus(adminEditDate, st.key)}
-                          style={{
-                            flex: 1,
-                            padding: '10px 6px',
-                            borderRadius: '10px',
-                            border: currentSt === st.key ? 'none' : '1px solid #dcd6cd',
-                            backgroundColor: currentSt === st.key ? '#2c2523' : '#ffffff',
-                            color: currentSt === st.key ? '#ffffff' : '#2c2523',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            cursor: 'pointer'
-                          }}
+                          key={slot}
+                          disabled={!check.ok}
+                          onClick={() => setSelectedTime(slot)}
+                          className={`py-2.5 px-2 rounded-xl border text-xs font-medium transition-all flex flex-col items-center justify-center ${
+                            !check.ok
+                              ? 'bg-[#F2EFE9] border-[#E5DEC9] text-[#BEB5A9] cursor-not-allowed line-through'
+                              : isSelected
+                              ? 'bg-[#6E5039] border-[#6E5039] text-white shadow-sm'
+                              : 'bg-[#FAF8F5] border-[#DCD3C6] text-[#2C2520] hover:border-[#6E5039]'
+                          }`}
+                          title={check.reason}
                         >
-                          {st.label}
+                          <span>{slot}</span>
+                          {!check.ok && (
+                            <span className="text-[9px] no-underline mt-0.5 opacity-80">{check.reason}</span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
 
-                  {(config.dateOverrides?.[adminEditDate]?.status || 'open') === 'open' && (
-                    <>
-                      <div style={{ fontSize: '13px', color: '#6e655f', marginBottom: '10px' }}>
-                        點選開啟或關閉 {adminEditDate} 可預約的時段（深色代表開放）：
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                        {allHalfHourPool.map((slot) => {
-                          const activeSlots = config.dateOverrides?.[adminEditDate]?.slots || config.defaultSlots;
-                          const isOpen = activeSlots.includes(slot);
-                          return (
-                            <button
-                              key={slot}
-                              type="button"
-                              onClick={() => toggleDateSlot(adminEditDate, slot)}
-                              style={{
-                                padding: '8px 0',
-                                borderRadius: '8px',
-                                border: isOpen ? 'none' : '1px solid #dcd6cd',
-                                backgroundColor: isOpen ? '#2e6f5e' : '#ffffff',
-                                color: isOpen ? '#ffffff' : '#8c827c',
-                                fontSize: '13px',
-                                fontWeight: '600',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              {slot}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
+                  {selectedTime && (
+                    <div className="mt-4 bg-[#F3EFE6] border border-[#D8CBB8] rounded-2xl p-3.5 flex items-center justify-between text-xs text-[#4A3C31]">
+                      <span>
+                        已選擇時段：
+                        <strong className="ml-1 text-[#2C2520]">
+                          {selectedDate} {selectedTime} ～{' '}
+                          {minsToTime(timeToMins(selectedTime) + selectedService.duration)}
+                        </strong>
+                      </span>
+                      <span className="text-[#6E5039] font-medium">共計 {selectedService.duration} 分鐘</span>
+                    </div>
                   )}
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* 區塊 B：預設每日時段管理 */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '22px', padding: '24px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 8px 0' }}>⚙️ 2. 平常日預設開放時段</h2>
-              <p style={{ fontSize: '13px', color: '#8c827c', margin: '0 0 12px 0' }}>點選即可開啟或關閉平常日的固定預約時段：</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                {allHalfHourPool.map((slot) => {
-                  const isOpen = config.defaultSlots.includes(slot);
-                  return (
-                    <button
-                      key={slot}
-                      type="button"
-                      onClick={() => {
-                        const next = isOpen
-                          ? config.defaultSlots.filter((s) => s !== slot)
-                          : [...config.defaultSlots, slot].sort();
-                        setConfig({ ...config, defaultSlots: next });
-                      }}
-                      style={{
-                        padding: '8px 0',
-                        borderRadius: '8px',
-                        border: isOpen ? 'none' : '1px solid #dcd6cd',
-                        backgroundColor: isOpen ? '#2c2523' : '#ffffff',
-                        color: isOpen ? '#ffffff' : '#8c827c',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {slot}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 區塊 C：服務項目與價格管理 */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '22px', padding: '24px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 14px 0' }}>⚙️ 3. 服務項目與價格設定</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-                {config.services.map((srv, index) => (
-                  <div key={srv.id} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input
-                      type="text"
-                      value={srv.name}
-                      onChange={(e) => {
-                        const updated = [...config.services];
-                        updated[index].name = e.target.value;
-                        setConfig({ ...config, services: updated });
-                      }}
-                      style={{ flex: 2, height: '40px', padding: '0 10px', borderRadius: '8px', border: '1px solid #dcd6cd', fontSize: '14px' }}
-                    />
-                    <input
-                      type="text"
-                      value={srv.price}
-                      onChange={(e) => {
-                        const updated = [...config.services];
-                        updated[index].price = e.target.value;
-                        setConfig({ ...config, services: updated });
-                      }}
-                      style={{ flex: 1, height: '40px', padding: '0 10px', borderRadius: '8px', border: '1px solid #dcd6cd', fontSize: '14px' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updated = config.services.filter((_, i) => i !== index);
-                        setConfig({ ...config, services: updated });
-                      }}
-                      style={{ height: '40px', padding: '0 12px', borderRadius: '8px', border: 'none', backgroundColor: '#f4e6e8', color: '#9e5863', fontWeight: '600', cursor: 'pointer' }}
-                    >
-                      刪除
-                    </button>
-                  </div>
-                ))}
+            {/* STEP 4: 備註與確認送出 */}
+            <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
+                  04
+                </span>
+                <div>
+                  <h2 className="text-base font-semibold tracking-wider text-[#2C2520]">需求備註與送出預約</h2>
+                  <p className="text-xs text-[#8A7968]">如有近期染燙紀錄、頭皮敏感狀況或指定造型需求，歡迎預先填寫</p>
+                </div>
               </div>
 
-              {/* 新增服務項目 */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  placeholder="新服務名稱"
-                  value={newServiceName}
-                  onChange={(e) => setNewServiceName(e.target.value)}
-                  style={{ flex: 2, height: '40px', padding: '0 10px', borderRadius: '8px', border: '1px solid #dcd6cd', fontSize: '14px' }}
-                />
-                <input
-                  type="text"
-                  placeholder="$價格"
-                  value={newServicePrice}
-                  onChange={(e) => setNewServicePrice(e.target.value)}
-                  style={{ flex: 1, height: '40px', padding: '0 10px', borderRadius: '8px', border: '1px solid #dcd6cd', fontSize: '14px' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!newServiceName.trim()) return;
-                    setConfig({
-                      ...config,
-                      services: [...config.services, { id: `s_${Date.now()}`, name: newServiceName, price: newServicePrice || '$500 起' }]
-                    });
-                    setNewServiceName('');
-                    setNewServicePrice('');
-                  }}
-                  style={{ height: '40px', padding: '0 14px', borderRadius: '8px', border: 'none', backgroundColor: '#eaf3f0', color: '#2e6f5e', fontWeight: '700', cursor: 'pointer' }}
-                >
-                  ＋新增
-                </button>
-              </div>
-            </div>
-
-            {/* 區塊 D：預約須知與地址設定 */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '22px', padding: '24px 22px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 12px 0' }}>⚙️ 4. 預約須知與店鋪地址</h2>
-              <label style={{ display: 'block', fontSize: '13px', color: '#6e655f', marginBottom: '6px' }}>預約須知（每行一條）：</label>
               <textarea
-                rows="5"
-                value={config.notices.join('\n')}
-                onChange={(e) => setConfig({ ...config, notices: e.target.value.split('\n') })}
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', marginBottom: '14px', lineHeight: '1.6' }}
+                rows={3}
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                placeholder="例如：近期頭皮較乾癢、希望討論好整理的鎖骨髮長..."
+                className="w-full p-3.5 bg-[#FAF8F5] border border-[#DCD3C6] rounded-2xl text-sm focus:outline-none focus:border-[#6E5039] mb-5"
               />
 
-              <label style={{ display: 'block', fontSize: '13px', color: '#6e655f', marginBottom: '6px' }}>店鋪地址：</label>
-              <input
-                type="text"
-                value={config.locationAddress}
-                onChange={(e) => setConfig({ ...config, locationAddress: e.target.value, mapQuery: e.target.value })}
-                style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', marginBottom: '10px' }}
-              />
+              <button
+                type="submit"
+                className="w-full py-4 rounded-2xl bg-[#2C2520] hover:bg-[#423730] text-[#F7F4EF] font-medium text-sm tracking-widest transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4 text-[#C8B9A6]" />
+                確認預約並發送 LINE 通知
+              </button>
+            </section>
+          </form>
+        </div>
+      )}
 
-              <label style={{ display: 'block', fontSize: '13px', color: '#6e655f', marginBottom: '6px' }}>地址補充說明：</label>
-              <input
-                type="text"
-                value={config.locationNote}
-                onChange={(e) => setConfig({ ...config, locationNote: e.target.value })}
-                style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px' }}
-              />
+      {/* 預約成功彈窗 Modal */}
+      {bookingSuccessModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#F7F4EF] border border-[#D8CBB8] rounded-3xl max-w-md w-full p-7 shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-[#6E5039] text-white flex items-center justify-center mx-auto mb-4">
+              <Check className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-semibold text-center text-[#2C2520] mb-1">
+              預約申請已送出（待設計師確認）
+            </h3>
+            <p className="text-xs text-center text-[#7A6855] mb-5">
+              系統已透過 LINE LIFF 傳送「預約待確認」通知至您的聊天室
+            </p>
+
+            <div className="bg-white rounded-2xl p-4 border border-[#E5DEC9] space-y-2 text-xs text-[#4A3C31] mb-6">
+              <div className="flex justify-between">
+                <span className="text-[#8A7968]">預約單號</span>
+                <span className="font-mono font-medium">{bookingSuccessModal.appt.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#8A7968]">貴賓姓名</span>
+                <span className="font-medium">{bookingSuccessModal.appt.customerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#8A7968]">預約服務</span>
+                <span className="font-medium text-[#6E5039]">{bookingSuccessModal.service.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#8A7968]">預約時段</span>
+                <span className="font-medium">
+                  {bookingSuccessModal.appt.date} {bookingSuccessModal.appt.time} -{' '}
+                  {bookingSuccessModal.appt.endTime}
+                </span>
+              </div>
             </div>
 
-            {/* 儲存後台設定按鈕 */}
-            <button
-              type="button"
-              disabled={savingAdmin}
-              onClick={() => handleSaveConfig(config)}
-              style={{ width: '100%', height: '52px', borderRadius: '14px', border: 'none', backgroundColor: '#2e6f5e', color: '#ffffff', fontSize: '16px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 14px rgba(46,111,94,0.25)' }}
-            >
-              {savingAdmin ? '同步儲存中...' : '💾 儲存並發布所有後台設定'}
-            </button>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => setBookingSuccessModal(null)}
+                className="flex-1 py-2.5 rounded-xl border border-[#C8B9A6] text-xs font-medium text-[#5C4E41] hover:bg-[#EFECE6]"
+              >
+                返回預約首頁
+              </button>
+              <button
+                onClick={() => {
+                  setBookingSuccessModal(null);
+                  setActiveView('admin');
+                  setIsAdminAuthenticated(true);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-[#6E5039] text-white text-xs font-medium hover:bg-[#593F2C]"
+              >
+                前往後台審核此單
+              </button>
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
-      </div>
+      {/* =====================================================
+          VIEW 2: 設計師後台管理介面 (Admin Dashboard)
+      ===================================================== */}
+      {activeView === 'admin' && (
+        <div className="max-w-5xl mx-auto px-4 pt-8">
+          {!isAdminAuthenticated ? (
+            /* 後台登入驗證畫面 */
+            <div className="max-w-md mx-auto bg-white border border-[#E5DEC9] rounded-3xl p-8 shadow-sm mt-8">
+              <div className="w-12 h-12 rounded-2xl bg-[#2C2520] text-[#C8B9A6] flex items-center justify-center mb-4">
+                <Lock className="w-5 h-5" />
+              </div>
+              <h2 className="text-lg font-semibold text-[#2C2520] mb-1">髮嶼設計師後台管理登入</h2>
+              <p className="text-xs text-[#8A7968] mb-5">
+                請輸入管理員通行碼以管理預約訂單、店休時段與價目表（預設測試密碼：8888，或直接點擊快速登入）
+              </p>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (adminPinInput === '8888' || adminPinInput === '') {
+                    setIsAdminAuthenticated(true);
+                    showToast('後台登入成功', '歡迎回來，髮嶼主理人', 'info');
+                  } else {
+                    showToast('密碼錯誤', '請輸入預設密碼 8888', 'error');
+                  }
+                }}
+                className="space-y-4"
+              >
+                <input
+                  type="password"
+                  value={adminPinInput}
+                  onChange={(e) => setAdminPinInput(e.target.value)}
+                  placeholder="請輸入管理員密碼 (8888)"
+                  className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-sm"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 rounded-xl bg-[#2C2520] text-white text-xs font-medium tracking-wider hover:bg-[#3E342D]"
+                  >
+                    驗證並進入後台
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAdminAuthenticated(true);
+                      showToast('快速體驗登入', '已進入設計師管理後台', 'info');
+                    }}
+                    className="px-4 py-3 rounded-xl bg-[#EFECE6] text-[#5C4E41] text-xs font-medium hover:bg-[#E5DEC9]"
+                  >
+                    一鍵快速登入
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            /* 後台主控台 */
+            <div className="space-y-6">
+              {/* 後台頂部導覽與分頁切換 */}
+              <div className="bg-white border border-[#E5DEC9] rounded-3xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-[#2C2520]">髮嶼 Hair Island · 設計師管理後台</h2>
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#E6EFE6] text-[#3B6E4C] font-medium">
+                      Admin 權限已啟用
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#8A7968] mt-1">
+                    即時連動 Firestore 資料庫與 LINE Messaging API 推播通知
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setAdminTab('appointments')}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      adminTab === 'appointments'
+                        ? 'bg-[#6E5039] text-white'
+                        : 'bg-[#FAF8F5] text-[#5C4E41] hover:bg-[#EFECE6]'
+                    }`}
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    Tab 1: 訂單管理 ({appointments.length})
+                  </button>
+                  <button
+                    onClick={() => setAdminTab('schedule')}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      adminTab === 'schedule'
+                        ? 'bg-[#6E5039] text-white'
+                        : 'bg-[#FAF8F5] text-[#5C4E41] hover:bg-[#EFECE6]'
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    Tab 2: 行事曆與時段管理
+                  </button>
+                  <button
+                    onClick={() => setAdminTab('services')}
+                    className={`px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      adminTab === 'services'
+                        ? 'bg-[#6E5039] text-white'
+                        : 'bg-[#FAF8F5] text-[#5C4E41] hover:bg-[#EFECE6]'
+                    }`}
+                  >
+                    <Scissors className="w-3.5 h-3.5" />
+                    Tab 3: 服務與價格設定
+                  </button>
+                  <button
+                    onClick={() => setIsAdminAuthenticated(false)}
+                    className="p-2 rounded-xl text-[#8A7968] hover:text-red-600 hover:bg-red-50"
+                    title="登出後台"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* ==========================================
+                  TAB 1: 訂單管理 (Appointments)
+              ========================================== */}
+              {adminTab === 'appointments' && (
+                <div className="space-y-4">
+                  {[...appointments]
+                    .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
+                    .map((appt) => {
+                      const srv = services.find((s) => s.id === appt.serviceId) || {
+                        name: '已下架服務',
+                        price: 0,
+                        duration: 60
+                      };
+
+                      const statusBadge = {
+                        pending: { label: '待確認 (Pending)', cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+                        confirmed: { label: '已確認 (Confirmed)', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+                        completed: { label: '已完成 (Completed)', cls: 'bg-stone-200 text-stone-700 border-stone-300' },
+                        cancelled: { label: '已取消 (Cancelled)', cls: 'bg-rose-100 text-rose-700 border-rose-200' }
+                      }[appt.status];
+
+                      return (
+                        <div
+                          key={appt.id}
+                          className="bg-white border border-[#E5DEC9] rounded-3xl p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                        >
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-medium ${statusBadge.cls}`}>
+                                {statusBadge.label}
+                              </span>
+                              <span className="text-sm font-semibold text-[#2C2520]">
+                                {appt.date} · {appt.time} - {appt.endTime}
+                              </span>
+                              <span className="text-xs text-[#8A7968] font-mono">#{appt.id}</span>
+                            </div>
+
+                            <div className="text-sm font-medium text-[#4A3C31]">
+                              貴賓：{appt.customerName}（{appt.phone}）
+                              <span className="text-xs text-[#8A7968] ml-2">LINE UID: {appt.liffUserId.slice(0, 10)}...</span>
+                            </div>
+
+                            <div className="text-xs text-[#6E5039] font-medium">
+                              預約項目：{srv.name}（{srv.duration} 分鐘 / NT$ {srv.price.toLocaleString()}）
+                            </div>
+
+                            {appt.remark && (
+                              <div className="text-xs text-[#7A6855] bg-[#FAF8F5] px-3 py-1.5 rounded-xl border border-[#ECE6DA] inline-block">
+                                備註：{appt.remark}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 訂單操作按鈕群 */}
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
+                            {appt.status === 'pending' && (
+                              <button
+                                onClick={() => handleConfirmAppointment(appt)}
+                                className="px-4 py-2 rounded-xl bg-[#06C755] hover:bg-[#05b04b] text-white text-xs font-medium flex items-center gap-1.5 shadow-xs"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                確認預約 (鎖定時段＋發送 LINE)
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => sendReminderMsg(appt, srv)}
+                              className="px-3.5 py-2 rounded-xl bg-[#F3EFE6] hover:bg-[#E5DEC9] text-[#5C4E41] text-xs font-medium flex items-center gap-1.5 border border-[#D8CBB8]"
+                            >
+                              <BellRing className="w-3.5 h-3.5 text-[#6E5039]" />
+                              一鍵發送明日提醒
+                            </button>
+
+                            {appt.status === 'confirmed' && (
+                              <button
+                                onClick={() => handleUpdateApptStatus(appt.id, 'completed')}
+                                className="px-3 py-2 rounded-xl border border-[#DCD3C6] text-xs text-[#5C4E41] hover:bg-[#FAF8F5]"
+                              >
+                                標記完成
+                              </button>
+                            )}
+
+                            {appt.status !== 'cancelled' && (
+                              <button
+                                onClick={() => handleUpdateApptStatus(appt.id, 'cancelled')}
+                                className="px-3 py-2 rounded-xl text-xs text-rose-600 hover:bg-rose-50"
+                              >
+                                取消訂單
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+
+              {/* ==========================================
+                  TAB 2: 行事曆與時段管理 (Schedule)
+              ========================================== */}
+              {adminTab === 'schedule' && (
+                <div className="bg-white border border-[#E5DEC9] rounded-3xl p-6 shadow-sm space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#ECE6DA]">
+                    <div>
+                      <h3 className="text-base font-semibold text-[#2C2520]">視覺化時段鎖定與店休設定</h3>
+                      <p className="text-xs text-[#8A7968]">
+                        點擊下方任一 30 分鐘區間即可手動切換「開放預約」或「店休/不開放」
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={scheduleDate}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                        className="px-3.5 py-2 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-xs font-medium"
+                      />
+                      <button
+                        onClick={() => toggleWholeDayOff(scheduleDate, true)}
+                        className="px-3 py-2 rounded-xl bg-[#2C2520] text-white text-xs hover:bg-[#3E342D]"
+                      >
+                        設為整日店休
+                      </button>
+                      <button
+                        onClick={() => toggleWholeDayOff(scheduleDate, false)}
+                        className="px-3 py-2 rounded-xl border border-[#DCD3C6] text-xs text-[#5C4E41] hover:bg-[#FAF8F5]"
+                      >
+                        全時段開放
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 時段狀態矩陣 */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-3">
+                    {ALL_DAILY_SLOTS.map((slot) => {
+                      const availDoc = availability.find((a) => a.date === scheduleDate);
+                      const isBlocked = availDoc ? availDoc.blockedSlots.includes(slot) : false;
+
+                      // 檢查該時段是否有對應的已確認訂單
+                      const occupyingAppt = appointments.find((apt) => {
+                        if (apt.date !== scheduleDate || apt.status !== 'confirmed') return false;
+                        const srv = services.find((s) => s.id === apt.serviceId);
+                        const slots = expandRequiredSlots(apt.time, srv ? srv.duration : 60);
+                        return slots.includes(slot);
+                      });
+
+                      const nextSlot = minsToTime(timeToMins(slot) + 30);
+
+                      return (
+                        <button
+                          key={slot}
+                          onClick={() => toggleManualBlockSlot(scheduleDate, slot)}
+                          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                            occupyingAppt
+                              ? 'bg-[#EFECE6] border-[#6E5039] text-[#2C2520]'
+                              : isBlocked
+                              ? 'bg-stone-800 border-stone-800 text-stone-100'
+                              : 'bg-[#FAF8F5] border-[#DCD3C6] text-[#2C2520] hover:border-[#6E5039]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full mb-2">
+                            <span className="text-xs font-semibold">
+                              {slot} - {nextSlot}
+                            </span>
+                            {isBlocked || occupyingAppt ? (
+                              <Lock className="w-3.5 h-3.5 opacity-80" />
+                            ) : (
+                              <Unlock className="w-3.5 h-3.5 text-[#3B6E4C]" />
+                            )}
+                          </div>
+
+                          {occupyingAppt ? (
+                            <div className="text-[11px] text-[#6E5039] font-medium truncate">
+                              客約：{occupyingAppt.customerName}
+                            </div>
+                          ) : isBlocked ? (
+                            <div className="text-[11px] text-amber-300">店休 / 已手動鎖定</div>
+                          ) : (
+                            <div className="text-[11px] text-[#3B6E4C]">開放預約中</div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ==========================================
+                  TAB 3: 服務與價格設定 (Services Setup CRUD)
+              ========================================== */}
+              {adminTab === 'services' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* 左側：新增 / 編輯表單 */}
+                  <form
+                    onSubmit={handleSaveService}
+                    className="bg-white border border-[#E5DEC9] rounded-3xl p-6 shadow-sm space-y-4 h-fit"
+                  >
+                    <h3 className="text-base font-semibold text-[#2C2520] flex items-center gap-2">
+                      {editingService ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                      {editingService ? '編輯服務項目' : '新增服務項目'}
+                    </h3>
+
+                    <div>
+                      <label className="block text-xs text-[#5C4E41] mb-1">品項名稱 *</label>
+                      <input
+                        type="text"
+                        value={newServiceForm.name}
+                        onChange={(e) => setNewServiceForm({ ...newServiceForm, name: e.target.value })}
+                        placeholder="例如：深層木質調精油SPA"
+                        className="w-full px-3.5 py-2 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-xs"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-[#5C4E41] mb-1">價格 (NT$) *</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="50"
+                          value={newServiceForm.price}
+                          onChange={(e) => setNewServiceForm({ ...newServiceForm, price: e.target.value })}
+                          placeholder="1500"
+                          className="w-full px-3.5 py-2 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-xs"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs text-[#5C4E41] mb-1">所需時間 (半小時單位)</label>
+                        <select
+                          value={newServiceForm.duration}
+                          onChange={(e) => setNewServiceForm({ ...newServiceForm, duration: Number(e.target.value) })}
+                          className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-xs"
+                        >
+                          {[30, 60, 90, 120, 150, 180, 210, 240].map((mins) => (
+                            <option key={mins} value={mins}>
+                              {mins} 分鐘 ({mins / 60} 小時)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-[#5C4E41] mb-1">服務說明</label>
+                      <textarea
+                        rows={2}
+                        value={newServiceForm.desc}
+                        onChange={(e) => setNewServiceForm({ ...newServiceForm, desc: e.target.value })}
+                        placeholder="簡述服務特色與包含流程..."
+                        className="w-full px-3.5 py-2 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-xs"
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        className="flex-1 py-2.5 rounded-xl bg-[#6E5039] text-white text-xs font-medium hover:bg-[#593F2C]"
+                      >
+                        {editingService ? '儲存修改' : '新增至資料庫'}
+                      </button>
+                      {editingService && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingService(null);
+                            setNewServiceForm({ name: '', price: '', duration: 60, desc: '' });
+                          }}
+                          className="px-3 py-2.5 rounded-xl border border-[#DCD3C6] text-xs text-[#5C4E41]"
+                        >
+                          取消
+                        </button>
+                      )}
+                    </div>
+                  </form>
+
+                  {/* 右側：現有服務列表 */}
+                  <div className="lg:col-span-2 space-y-3">
+                    {services.map((srv) => (
+                      <div
+                        key={srv.id}
+                        className="bg-white border border-[#E5DEC9] rounded-2xl p-4 flex items-center justify-between gap-4"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-[#2C2520]">{srv.name}</span>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#EFECE6] text-[#6E5039]">
+                              {srv.duration} 分鐘
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#8A7968] mt-1">{srv.desc}</p>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-sm font-semibold text-[#6E5039]">
+                            NT$ {srv.price.toLocaleString()}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setEditingService(srv);
+                              setNewServiceForm({
+                                name: srv.name,
+                                price: srv.price,
+                                duration: srv.duration,
+                                desc: srv.desc || ''
+                              });
+                            }}
+                            className="p-2 rounded-xl hover:bg-[#EFECE6] text-[#5C4E41]"
+                            title="編輯"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteService(srv.id)}
+                            className="p-2 rounded-xl hover:bg-rose-50 text-rose-600"
+                            title="刪除"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* LINE Messaging API / LIFF 觸發紀錄監控面板 */}
+              <div className="bg-[#2C2520] text-[#EBE5DC] rounded-3xl p-6 shadow-md">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#06C755]" />
+                    <h4 className="text-xs font-semibold tracking-wider uppercase">
+                      LINE LIFF & Messaging API Webhook 即時發訊紀錄
+                    </h4>
+                  </div>
+                  <span className="text-[11px] text-[#9A8C7E]">共 {lineLogs.length} 筆推播紀錄</span>
+                </div>
+
+                {lineLogs.length === 0 ? (
+                  <p className="text-xs text-[#9A8C7E] py-3">
+                    尚無發訊紀錄。請嘗試於客戶端送出預約、於後台點擊「確認預約」或「一鍵發送明日提醒」測試觸發。
+                  </p>
+                ) : (
+                  <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                    {lineLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="bg-[#3A312A] border border-[#52443A] rounded-2xl p-3.5 text-xs space-y-1"
+                      >
+                        <div className="flex items-center justify-between text-[#C8B9A6]">
+                          <span className="font-semibold text-[#06C755]">{log.type}</span>
+                          <span>
+                            對象：{log.to} · {log.time}
+                          </span>
+                        </div>
+                        <pre className="text-[#EBE5DC] whitespace-pre-wrap font-sans leading-relaxed">
+                          {log.content}
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
