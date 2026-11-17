@@ -3,7 +3,9 @@ import React, { useState, useEffect } from 'react';
 export default function App() {
   const [userName, setUserName] = useState('鄭宇軒Peter'); 
   const [serviceItem, setServiceItem] = useState('質感剪髮');
-  const [appointmentDate, setAppointmentDate] = useState('2026-11-19 15:30');
+  const [appointmentDate, setAppointmentDate] = useState('');
+  const [appointmentTime, setAppointmentTime] = useState('');
+  const [remark, setRemark] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,22 +29,24 @@ export default function App() {
   // 點擊送出時，串接 Google Apps Script 發送 LINE 預約推播通知
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    if (!appointmentDate || !appointmentTime) {
+      alert('請完整選擇預約日期與時間');
+      return;
+    }
 
+    setIsSubmitting(true);
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzz6sxxZ-pArV_MJ2yypT6gUuMaZQEmXXM597ayfQcJIlWuYvAYISavd4MGR4cytpw0/exec";
 
     try {
-      // 透過 fetch 將預約資料送給 GAS 後端觸發推播
       await fetch(GAS_URL, {
         method: "POST",
-        mode: "no-cors", // 避免瀏覽器 CORS 擋住
-        headers: {
-          "Content-Type": "application/json",
-        },
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientName: userName,
           serviceItem: serviceItem,
-          appointmentTime: appointmentDate
+          appointmentTime: `${appointmentDate} ${appointmentTime}`,
+          remark: remark || "無"
         })
       });
     } catch (error) {
@@ -74,11 +78,13 @@ export default function App() {
             <div style={{ fontSize: '14px', color: '#555555', lineHeight: '1.8', marginBottom: '24px', textAlign: 'left', backgroundColor: '#faf8f5', padding: '16px 20px', borderRadius: '12px' }}>
               謝謝 <strong>{userName}</strong>，我們已收到您的預約申請：<br />
               📌 項目：<strong>{serviceItem}</strong><br />
-              📅 日期：<strong>{appointmentDate}</strong>
+              📅 日期：<strong>{appointmentDate}</strong><br />
+              ⏰ 時間：<strong>{appointmentTime}</strong><br />
+              💬 備註：<strong>{remark || '無'}</strong>
             </div>
 
             <button 
-              onClick={() => setSubmitted(false)}
+              onClick={() => { setSubmitted(false); setRemark(''); }}
               style={{ width: '100%', padding: '12px', backgroundColor: '#f0ece4', color: '#4a453e', border: '1px solid #dcd6cd', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
             >
               修改預約內容
@@ -101,12 +107,42 @@ export default function App() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#444', marginBottom: '6px' }}>預約日期與時間</label>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#444', marginBottom: '6px' }}>選擇預約日期</label>
               <input 
-                type="text" 
+                type="date" 
+                required
                 value={appointmentDate}
                 onChange={(e) => setAppointmentDate(e.target.value)}
-                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', backgroundColor: '#fff', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#444', marginBottom: '6px' }}>選擇預約時間</label>
+              <select 
+                value={appointmentTime}
+                onChange={(e) => setAppointmentTime(e.target.value)}
+                required
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', backgroundColor: '#fff', boxSizing: 'border-box' }}
+              >
+                <option value="">請選擇時段</option>
+                <option value="10:00 AM">10:00 AM</option>
+                <option value="11:30 AM">11:30 AM</option>
+                <option value="02:00 PM">02:00 PM</option>
+                <option value="03:30 PM">03:30 PM</option>
+                <option value="05:00 PM">05:00 PM</option>
+                <option value="06:30 PM">06:30 PM</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#444', marginBottom: '6px' }}>備註事項（選填）</label>
+              <textarea 
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                placeholder="例如：指定設計師、希望加強頭皮按摩等..."
+                rows="2"
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #dcd6cd', fontSize: '14px', boxSizing: 'border-box', resize: 'none' }}
               />
             </div>
 
