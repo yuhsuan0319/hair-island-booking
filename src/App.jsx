@@ -42,32 +42,19 @@ function App() {
       `⏰ 預約時段：${time}\n` +
       `📝 備註需求：${note || '無'}\n` +
       `----------------------------\n` +
-      `預約已送出，請回傳此訊息給設計師確認！`;
+      `預約已送出，請將此明細傳送給設計師確認！`;
 
-    // 檢查是否支援 shareTargetPicker（適合用來發送預約明細）
-    if (liff.isApiAvailable('shareTargetPicker')) {
-      liff.shareTargetPicker([
-        {
-          type: 'text',
-          text: messageText
-        }
-      ])
-      .then((res) => {
-        if (res) {
-          setSubmitted(true);
-        } else {
-          // 使用者取消分享
-          console.log('使用者取消分享');
-        }
-      })
-      .catch((err) => {
-        console.error('分享失敗', err);
-        setSubmitted(true);
-      });
-    } else {
-      // 若環境不支援則直接顯示成功畫面
-      setSubmitted(true);
-    }
+    // 使用 LINE 標準文字分享協定，直接強制啟動手機 LINE 的分享選單
+    const encodedText = encodeURIComponent(messageText);
+    const lineShareUrl = `https://line.me/R/msg/text/?${encodedText}`;
+
+    // 顯示成功畫面
+    setSubmitted(true);
+
+    // 延遲一點點時間自動跳轉到 LINE 分享頁面讓用戶發送
+    setTimeout(() => {
+      window.location.href = lineShareUrl;
+    }, 800);
   };
 
   return (
@@ -165,11 +152,9 @@ function App() {
           /* 預約成功完成畫面 */
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>✨</div>
-            <h3 style={{ margin: '0 0 10px 0', color: '#2c2c2c' }}>預約資訊已成功傳送！</h3>
+            <h3 style={{ margin: '0 0 10px 0', color: '#2c2c2c' }}>正在導向 LINE 發送預約明細...</h3>
             <p style={{ color: '#666', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
-              謝謝 <strong>{displayName}</strong>，您的預約明細已順利發送：<br/>
-              📌 項目：<strong>{service}</strong><br/>
-              📅 日期：<strong>{date}</strong> ({time})
+              謝謝 <strong>{displayName}</strong>，頁面即將帶您將預約單傳送至聊天室！
             </p>
             <button 
               onClick={() => setSubmitted(false)}
@@ -183,7 +168,7 @@ function App() {
                 cursor: 'pointer' 
               }}
             >
-              再次預約 / 修改內容
+              返回修改預約
             </button>
           </div>
         )}
