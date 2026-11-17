@@ -1,1394 +1,1255 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
-// ==========================================
-// 0. 內建極簡 SVG 圖示庫 (免安裝 lucide-react，雲端直接編譯100%通過)
-// ==========================================
-const Icon = ({ d, className = "w-4 h-4" }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    {Array.isArray(d) ? d.map((path, i) => <path key={i} d={path} />) : <path d={d} />}
-  </svg>
-);
+// ==================== 系統環境常數 ====================
+const LIFF_ID = '2012650134-fNn1I0l8';
+const ADMIN_USER_ID = 'U5e88b1121f054ba725948e898394016e';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzz6sxxZ-pArV_MJ2yypT6gUuMaZQEmXXM597ayfQcJIlWuYvAYISavd4MGR4cytpw0/exec';
 
-const Calendar = (p) => <Icon {...p} d={["M8 2v4", "M16 2v4", "M3 10h18", "M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"]} />;
-const Clock = (p) => <Icon {...p} d={["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 6v6l4 2"]} />;
-const User = (p) => <Icon {...p} d={["M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2", "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"]} />;
-const Phone = (p) => <Icon {...p} d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />;
-const CheckCircle2 = (p) => <Icon {...p} d={["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "m9 12 2 2 4-4"]} />;
-const AlertCircle = (p) => <Icon {...p} d={["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z", "M12 8v4", "M12 16h.01"]} />;
-const Sparkles = (p) => <Icon {...p} d={["m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"]} />;
-const ShieldCheck = (p) => <Icon {...p} d={["M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z", "m9 12 2 2 4-4"]} />;
-const BellRing = (p) => <Icon {...p} d={["M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9", "M10.3 21a1.94 1.94 0 0 0 3.4 0"]} />;
-const Scissors = (p) => <Icon {...p} d={["M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z", "M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z", "M20 4 8.12 15.88", "M14.47 14.48 20 20", "M8.12 8.12 12 12"]} />;
-const Plus = (p) => <Icon {...p} d={["M5 12h14", "M12 5v14"]} />;
-const Trash2 = (p) => <Icon {...p} d={["M3 6h18", "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6", "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"]} />;
-const Edit3 = (p) => <Icon {...p} d={["M12 20h9", "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"]} />;
-const Lock = (p) => <Icon {...p} d={["M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z", "M7 11V7a5 5 0 0 1 10 0v4"]} />;
-const Unlock = (p) => <Icon {...p} d={["M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z", "M7 11V7a5 5 0 0 1 9.9-1"]} />;
-const MessageSquare = (p) => <Icon {...p} d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />;
-const ChevronLeft = (p) => <Icon {...p} d="m15 18-6-6 6-6" />;
-const ChevronRight = (p) => <Icon {...p} d="m9 18 6-6-6-6" />;
-const LogOut = (p) => <Icon {...p} d={["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "m16 17 5-5-5-5", "M21 12H9"]} />;
-const Check = (p) => <Icon {...p} d="M20 6 9 17l-5-5" />;
-const X = (p) => <Icon {...p} d={["M18 6 6 18", "m6 6 12 12"]} />;
-
-// ==========================================
-// 1. 初始模擬資料庫 (對應 Firestore Schema)
-// ==========================================
-const getTodayStr = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
-const getFutureDateStr = (daysToAdd) => {
-  const d = new Date();
-  d.setDate(d.getDate() + daysToAdd);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
-const INITIAL_SERVICES = [
-  { id: 'srv-1', name: '島嶼深層頭皮養護 SPA', price: 1800, duration: 90, desc: '溫和淨化毛囊角質，搭配肩頸溫感精油舒壓與草本蒸氣護理' },
-  { id: 'srv-2', name: '質感結構剪髮＋木質調洗髮', price: 1000, duration: 60, desc: '依頭型與落髮流向精準剪裁，含鬆弛感芳療洗髮' },
-  { id: 'srv-3', name: '植萃溫和染髮（含結構護髮）', price: 3200, duration: 150, desc: '低敏植萃染膏，補充髮芯角蛋白，呈現自然霧感染澤' },
-  { id: 'srv-4', name: '水質感鬆弛燙髮（含剪髮）', price: 3800, duration: 180, desc: '低溫塑型打造自然波紋，吹乾即可呈現蓬鬆空氣感' },
-  { id: 'srv-5', name: '瞬效金緻結構深層護髮', price: 1500, duration: 60, desc: '四劑式分子滲透修護，針對受損與乾燥髮尾重建光澤' }
-];
-
-const INITIAL_APPOINTMENTS = [
-  {
-    id: 'apt-1001',
-    liffUserId: 'U89a1b2c3d4e5f6g7h8i9j0',
-    customerName: '林知夏',
-    phone: '0912-345-678',
-    serviceId: 'srv-1',
-    date: getFutureDateStr(1),
-    time: '13:00',
-    endTime: '14:30',
-    status: 'confirmed',
-    remark: '近期頭皮較敏感，希望力道偏輕柔。'
-  },
-  {
-    id: 'apt-1002',
-    liffUserId: 'U11b2c3d4e5f6g7h8i9j0k1',
-    customerName: '陳沐恩',
-    phone: '0928-888-168',
-    serviceId: 'srv-3',
-    date: getFutureDateStr(1),
-    time: '15:30',
-    endTime: '18:00',
-    status: 'pending',
-    remark: '想染偏冷茶棕色，遮蓋少量白髮。'
-  },
-  {
-    id: 'apt-1003',
-    liffUserId: 'U55f6g7h8i9j0k1l2m3n4o5',
-    customerName: '張語恬',
-    phone: '0933-777-999',
-    serviceId: 'srv-2',
-    date: getFutureDateStr(2),
-    time: '11:00',
-    endTime: '12:00',
-    status: 'confirmed',
-    remark: '修剪瀏海與髮尾層次。'
-  }
-];
-
-const INITIAL_AVAILABILITY = [
-  {
-    date: getFutureDateStr(1),
-    blockedSlots: ['12:00', '12:30', '13:00', '13:30', '14:00']
-  },
-  {
-    date: getFutureDateStr(2),
-    blockedSlots: ['11:00', '11:30', '15:00', '15:30']
-  }
-];
-
-const ALL_DAILY_SLOTS = [
+// 營業時段：11:00 至 19:00 (每 30 分鐘一區間，19:00 為打烊時間，最後可預約起始點為 18:30)
+const DAILY_TIME_SLOTS = [
   '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
   '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
   '17:00', '17:30', '18:00', '18:30'
 ];
+const CLOSING_MINUTES = 19 * 60; // 19:00 (1140 分鐘)
 
-// ==========================================
-// 2. 時段計算輔助函式 (Time Slot Engine)
-// ==========================================
-const timeToMins = (t) => {
-  const [h, m] = t.split(':').map(Number);
+// ==================== 預設資料庫結構 (Schema Defaults) ====================
+const DEFAULT_SERVICES = [
+  { id: 'srv_1', name: '質感剪髮', price: 600, duration: 60 },
+  { id: 'srv_2', name: '精油頭皮養護', price: 1200, duration: 60 },
+  { id: 'srv_3', name: '精油頭皮養護 + 質感剪髮', price: 1600, duration: 90 },
+  { id: 'srv_4', name: '深層結構護髮', price: 1500, duration: 90 },
+  { id: 'srv_5', name: '經典質感染髮', price: 2200, duration: 150 },
+  { id: 'srv_6', name: '日系溫塑燙髮', price: 2800, duration: 180 }
+];
+
+// 時間轉換工具函式
+const timeToMinutes = (timeStr) => {
+  const [h, m] = timeStr.split(':').map(Number);
   return h * 60 + m;
 };
 
-const minsToTime = (mins) => {
-  const h = String(Math.floor(mins / 60)).padStart(2, '0');
-  const m = String(mins % 60).padStart(2, '0');
+const minutesToTime = (totalMinutes) => {
+  const h = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+  const m = String(totalMinutes % 60).padStart(2, '0');
   return `${h}:${m}`;
 };
 
-const expandRequiredSlots = (startTime, durationMinutes) => {
-  const slotsCount = Math.ceil(durationMinutes / 30);
-  const startMins = timeToMins(startTime);
-  const result = [];
-  for (let i = 0; i < slotsCount; i++) {
-    result.push(minsToTime(startMins + i * 30));
+// 根據起始時間與時長（分鐘），取得佔用的所有 30 分鐘區間陣列
+const getOccupiedSlots = (startTime, duration) => {
+  const slots = [];
+  const startMin = timeToMinutes(startTime);
+  const steps = Math.ceil(duration / 30);
+  for (let i = 0; i < steps; i++) {
+    slots.push(minutesToTime(startMin + i * 30));
   }
-  return result;
+  return slots;
 };
 
 export default function App() {
-  const [services, setServices] = useState(INITIAL_SERVICES);
-  const [appointments, setAppointments] = useState(INITIAL_APPOINTMENTS);
-  const [availability, setAvailability] = useState(INITIAL_AVAILABILITY);
+  // ==================== 狀態管理 ====================
+  // 視圖切換：'customer' (客戶預約) | 'my_bookings' (我的預約) | 'admin' (設計師後台)
+  const [currentView, setCurrentView] = useState('customer');
+  const [adminTab, setAdminTab] = useState('appointments'); // 'appointments' | 'schedule' | 'services'
 
-  const [activeView, setActiveView] = useState('customer');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [adminPinInput, setAdminPinInput] = useState('');
-  const [adminTab, setAdminTab] = useState('appointments');
+  // LINE LIFF 與管理員權限狀態
+  const [liffProfile, setLiffProfile] = useState({ userId: '', displayName: '' });
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [logoClickCount, setLogoClickCount] = useState(0);
 
-  const [liffProfile, setLiffProfile] = useState({
-    userId: 'U99x8y7z6w5v4u3t2s1r0',
-    displayName: '林宥嘉 (LIFF 訪客)',
-    isLoggedIn: true
-  });
-  const [lineLogs, setLineLogs] = useState([]);
-  const [toast, setToast] = useState(null);
+  // 三大核心資料表 (Schema: Services, Appointments, Availability)
+  const [services, setServices] = useState(DEFAULT_SERVICES);
+  const [appointments, setAppointments] = useState([]);
+  const [availability, setAvailability] = useState({}); // 格式: { 'YYYY-MM-DD': ['12:00', '12:30'] }
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const [customerName, setCustomerName] = useState(liffProfile.displayName);
-  const [phone, setPhone] = useState('0918-520-319');
-  const [selectedServiceId, setSelectedServiceId] = useState(INITIAL_SERVICES[0].id);
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
-  const [selectedDate, setSelectedDate] = useState(getFutureDateStr(1));
+  // View 1: 客戶端表單狀態
+  const [customerName, setCustomerName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [selectedServiceId, setSelectedServiceId] = useState(DEFAULT_SERVICES[0].id);
+  const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [remark, setRemark] = useState('');
-  const [bookingSuccessModal, setBookingSuccessModal] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [scheduleDate, setScheduleDate] = useState(getFutureDateStr(1));
-  const [editingService, setEditingService] = useState(null);
-  const [newServiceForm, setNewServiceForm] = useState({ name: '', price: '', duration: 60, desc: '' });
+  // 月曆檢視年月 (預設當月)
+  const todayObj = new Date();
+  const [calYear, setCalYear] = useState(todayObj.getFullYear());
+  const [calMonth, setCalMonth] = useState(todayObj.getMonth());
 
-  const showToast = (title, message, type = 'info') => {
-    setToast({ title, message, type, id: Date.now() });
-    setTimeout(() => {
-      setToast((prev) => (prev && prev.title === title ? null : prev));
-    }, 4500);
+  // View 2: 後台管理表單狀態
+  const [scheduleDate, setScheduleDate] = useState(() => {
+    const y = todayObj.getFullYear();
+    const m = String(todayObj.getMonth() + 1).padStart(2, '0');
+    const d = String(todayObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  });
+  const [editingService, setEditingService] = useState({ id: '', name: '', price: '', duration: 60 });
+
+  // ==================== LINE 整合 API 邏輯函式 ====================
+  // 1. 初始化 LIFF，取得 userId 與 displayName
+  const initLiff = async () => {
+    try {
+      if (!window.liff) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      await window.liff.init({ liffId: LIFF_ID });
+      if (window.liff.isLoggedIn()) {
+        const profile = await window.liff.getProfile();
+        setLiffProfile({ userId: profile.userId, displayName: profile.displayName });
+        setCustomerName(profile.displayName);
+        if (profile.userId === ADMIN_USER_ID) {
+          setIsAdmin(true);
+        }
+      } else {
+        window.liff.login();
+      }
+    } catch (err) {
+      console.error('LIFF 初始化失敗:', err);
+    }
   };
 
-  const initLiff = () => {
-    const mockProfile = {
-      userId: 'U99x8y7z6w5v4u3t2s1r0',
-      displayName: '蘇郁婷',
-      isLoggedIn: true
-    };
-    setLiffProfile(mockProfile);
-    setCustomerName(mockProfile.displayName);
-    showToast('LINE LIFF 已同步', `成功載入 LINE 帳號：${mockProfile.displayName}`, 'line');
-  };
-
-  const sendBookingPendingMsg = (appt, srv) => {
-    const msg = {
-      id: `msg-${Date.now()}`,
-      type: 'LIFF SendMessages (待確認通知)',
-      to: `${appt.customerName} (${appt.liffUserId.slice(0, 8)}...)`,
-      time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
-      content: `【髮嶼 Hair Island｜預約待確認】\n親愛的 ${appt.customerName} 您好，已收到您的預約申請：\n・服務：${srv.name}\n・日期：${appt.date}\n・時段：${appt.time} - ${appt.endTime}\n設計師確認行程後，將透過 LINE 發送正式預約成功通知。`
-    };
-    setLineLogs((prev) => [msg, ...prev]);
-    showToast('LINE 通知已發送', `已向 ${appt.customerName} 發送「預約待確認」訊息`, 'line');
-  };
-
-  const sendBookingConfirmedMsg = (appt, srv) => {
-    const msg = {
-      id: `msg-${Date.now()}`,
-      type: 'Messaging API Push (預約已確認)',
-      to: `${appt.customerName} (${appt.liffUserId.slice(0, 8)}...)`,
-      time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
-      content: `【髮嶼 Hair Island｜預約已確認】\n親愛的 ${appt.customerName} 您好，您的預約已為您保留：\n・服務：${srv.name} (NT$${srv.price})\n・時間：${appt.date} ${appt.time} - ${appt.endTime}\n期待您的蒞臨，享受專屬的島嶼放鬆時光。`
-    };
-    setLineLogs((prev) => [msg, ...prev]);
-    showToast('LINE 預約確認已推播', `已透過 Webhook 通知 ${appt.customerName} 預約成功`, 'line');
-  };
-
-  const sendReminderMsg = (appt, srv) => {
-    const msg = {
-      id: `msg-${Date.now()}`,
-      type: 'Messaging API Push (前一日提醒)',
-      to: `${appt.customerName} (${appt.liffUserId.slice(0, 8)}...)`,
-      time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }),
-      content: `【髮嶼 Hair Island｜明日預約溫馨提醒】\n親愛的 ${appt.customerName} 您好，提醒您明日 (${appt.date}) ${appt.time} 預約了「${srv.name}」。\n若需微調時間請提前告知，我們明日見！`
-    };
-    setLineLogs((prev) => [msg, ...prev]);
-    showToast('LINE 明日提醒已發送', `已向 ${appt.customerName} 發送前一日溫馨提醒`, 'line');
-  };
-
-  const selectedService = useMemo(
-    () => services.find((s) => s.id === selectedServiceId) || services[0],
-    [services, selectedServiceId]
-  );
-
-  const getCombinedBlockedSlotsForDate = (dateStr) => {
-    const availDoc = availability.find((a) => a.date === dateStr);
-    const manualBlocked = availDoc ? availDoc.blockedSlots : [];
-
-    const confirmedAppts = appointments.filter(
-      (apt) => apt.date === dateStr && apt.status === 'confirmed'
-    );
-
-    const apptBlocked = [];
-    confirmedAppts.forEach((apt) => {
-      const srv = services.find((s) => s.id === apt.serviceId);
-      const duration = srv ? srv.duration : 60;
-      const slots = expandRequiredSlots(apt.time, duration);
-      apptBlocked.push(...slots);
-    });
-
-    return Array.from(new Set([...manualBlocked, ...apptBlocked]));
-  };
-
-  const checkSlotBookable = (dateStr, startTime, durationMinutes) => {
-    const startMins = timeToMins(startTime);
-    const endMins = startMins + durationMinutes;
-    if (endMins > 19 * 60) return { ok: false, reason: '逾打烊時間 (19:00)' };
-
-    const blocked = getCombinedBlockedSlotsForDate(dateStr);
-    const neededSlots = expandRequiredSlots(startTime, durationMinutes);
-
-    for (const s of neededSlots) {
-      if (blocked.includes(s)) {
-        return { ok: false, reason: '時段衝突或已滿' };
+  // 2. 客戶端送出預約後，發送「預約待確認」通知
+  const sendBookingPendingMsg = async (appointment, serviceObj) => {
+    // 若在 LINE App 內部開啟，直接於當前聊天室發送待確認小卡文字
+    if (window.liff && window.liff.isInClient()) {
+      try {
+        await window.liff.sendMessages([
+          {
+            type: 'text',
+            text: `🌿【髮嶼 Hair Island｜預約待確認】\n親愛的 ${appointment.customerName} 您好，已收到您的預約申請：\n\n・服務項目：${serviceObj.name} ($${serviceObj.price})\n・預計時長：${serviceObj.duration} 分鐘\n・預約日期：${appointment.date}\n・預約時段：${appointment.time} - ${appointment.endTime}\n・備註事項：${appointment.remark || '無'}\n\n設計師確認檔期後將發送「預約成功」通知給您！`
+          }
+        ]);
+      } catch (e) {
+        console.warn('LIFF 聊天室傳訊略過:', e);
       }
     }
-    return { ok: true, reason: '可預約' };
+
+    // 同步呼叫後端 Webhook 發送 LINE Push 給管理員與客人
+    await fetch(GAS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'sendBookingPendingMsg',
+        appointment,
+        serviceName: serviceObj.name,
+        servicePrice: serviceObj.price,
+        duration: serviceObj.duration
+      })
+    });
   };
 
-  const checkDateHasAnySlot = (dateStr, durationMinutes) => {
-    return ALL_DAILY_SLOTS.some((slot) => checkSlotBookable(dateStr, slot, durationMinutes).ok);
+  // 3. 後台設計師點擊確認後，呼叫 LINE Messaging API 發送「預約已確認」
+  const sendBookingConfirmedMsg = async (appointment, serviceObj, updatedAppointments, updatedAvailability) => {
+    await fetch(GAS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'sendBookingConfirmedMsg',
+        appointment,
+        serviceName: serviceObj ? serviceObj.name : '專屬美髮服務',
+        appointments: updatedAppointments,
+        availability: updatedAvailability
+      })
+    });
   };
 
-  const calendarDays = useMemo(() => {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const firstDayOfWeek = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const todayStr = getTodayStr();
-
-    const days = [];
-    for (let i = 0; i < firstDayOfWeek; i++) {
-      days.push(null);
+  // 4. 後台觸發，呼叫 LINE Messaging API 發送前一日提醒
+  const sendReminderMsg = async (appointment, serviceObj) => {
+    try {
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sendReminderMsg',
+          appointment,
+          serviceName: serviceObj ? serviceObj.name : '專屬美髮服務'
+        })
+      });
+      alert(`✅ 已透過 LINE 向「${appointment.customerName}」發送明日預約提醒！`);
+    } catch (err) {
+      alert('發送失敗，請檢查網路連線');
     }
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const isPast = dateStr < todayStr;
-      const hasAvailableSlot = !isPast && checkDateHasAnySlot(dateStr, selectedService.duration);
-      days.push({
-        dayNumber: d,
+  };
+
+  // 雲端與本地資料同步
+  const syncDatabase = async (nextServices, nextAppointments, nextAvailability) => {
+    localStorage.setItem('hi_services', JSON.stringify(nextServices));
+    localStorage.setItem('hi_appointments', JSON.stringify(nextAppointments));
+    localStorage.setItem('hi_availability', JSON.stringify(nextAvailability));
+
+    try {
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'syncDatabase',
+          services: nextServices,
+          appointments: nextAppointments,
+          availability: nextAvailability
+        })
+      });
+    } catch (e) {
+      console.error('雲端同步失敗:', e);
+    }
+  };
+
+  // 初始化載入 Tailwind CSS、LIFF 與雲端資料庫
+  useEffect(() => {
+    // 確保環境載入 Tailwind CSS
+    if (!document.getElementById('tailwind-cdn')) {
+      const script = document.createElement('script');
+      script.id = 'tailwind-cdn';
+      script.src = 'https://cdn.tailwindcss.com';
+      document.head.appendChild(script);
+    }
+
+    initLiff();
+
+    // 先讀取本地快取
+    const localSrv = localStorage.getItem('hi_services');
+    const localApt = localStorage.getItem('hi_appointments');
+    const localAvl = localStorage.getItem('hi_availability');
+    if (localSrv) setServices(JSON.parse(localSrv));
+    if (localApt) setAppointments(JSON.parse(localApt));
+    if (localAvl) setAvailability(JSON.parse(localAvl));
+
+    // 再從後端拉取最新資料庫狀態
+    const fetchCloudDB = async () => {
+      setIsSyncing(true);
+      try {
+        const res = await fetch(`${GAS_URL}?action=getDatabase`);
+        const data = await res.json();
+        if (data?.services?.length) {
+          setServices(data.services);
+          setSelectedServiceId(data.services[0].id);
+          localStorage.setItem('hi_services', JSON.stringify(data.services));
+        }
+        if (data?.appointments) {
+          setAppointments(data.appointments);
+          localStorage.setItem('hi_appointments', JSON.stringify(data.appointments));
+        }
+        if (data?.availability) {
+          setAvailability(data.availability);
+          localStorage.setItem('hi_availability', JSON.stringify(data.availability));
+        }
+      } catch (e) {
+        console.log('使用本地資料庫快取');
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+    fetchCloudDB();
+  }, []);
+
+  // 當前選擇的服務物件
+  const selectedService = useMemo(() => {
+    return services.find((s) => s.id === selectedServiceId) || services[0];
+  }, [services, selectedServiceId]);
+
+  // ==================== 時段與空檔動態檢核邏輯 ====================
+  // 取得特定日期已被佔用的所有 30 分鐘區間（包含設計師 blockedSlots + 已確認訂單 + 待確認訂單防撞）
+  const getUnavailableSlotsForDate = (dateStr, ignoreAppointmentId = null) => {
+    const blocked = new Set(availability[dateStr] || []);
+
+    appointments.forEach((apt) => {
+      if (apt.id === ignoreAppointmentId) return;
+      if (apt.date === dateStr && (apt.status === 'confirmed' || apt.status === 'pending')) {
+        const srv = services.find((s) => s.id === apt.serviceId);
+        const dur = srv ? srv.duration : 60;
+        const occupied = getOccupiedSlots(apt.time, dur);
+        occupied.forEach((slot) => blocked.add(slot));
+      }
+    });
+
+    return blocked;
+  };
+
+  // 檢查特定日期、特定起始時間、特定服務時長是否可預約
+  const isSlotBookable = (dateStr, startTime, durationMinutes, ignoreAppointmentId = null) => {
+    const startMin = timeToMinutes(startTime);
+    const endMin = startMin + durationMinutes;
+
+    // 1. 若服務結束時間跨越 19:00 (1140 分鐘)，不可預約
+    if (endMin > CLOSING_MINUTES) return false;
+
+    // 2. 檢查該服務時長涵蓋的每一個 30 分鐘區間是否皆為空檔
+    const requiredSlots = getOccupiedSlots(startTime, durationMinutes);
+    const unavailableSet = getUnavailableSlotsForDate(dateStr, ignoreAppointmentId);
+
+    for (const slot of requiredSlots) {
+      if (unavailableSet.has(slot)) return false;
+    }
+    return true;
+  };
+
+  // 檢查該日 11:00-19:00 是否還有任何空檔可供當前所選服務預約
+  const hasAvailableSlotOnDate = (dateStr, durationMinutes) => {
+    return DAILY_TIME_SLOTS.some((slot) => isSlotBookable(dateStr, slot, durationMinutes));
+  };
+
+  // 產生當月月曆陣列
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    const totalDays = new Date(calYear, calMonth + 1, 0).getDate();
+    const todayMidnight = new Date(todayObj.getFullYear(), todayObj.getMonth(), todayObj.getDate());
+
+    const grid = [];
+    for (let i = 0; i < firstDay; i++) grid.push(null);
+
+    for (let d = 1; d <= totalDays; d++) {
+      const mStr = String(calMonth + 1).padStart(2, '0');
+      const dStr = String(d).padStart(2, '0');
+      const dateStr = `${calYear}-${mStr}-${dStr}`;
+      const cellDate = new Date(calYear, calMonth, d);
+      const isPast = cellDate < todayMidnight;
+
+      const duration = selectedService ? selectedService.duration : 60;
+      const canBook = !isPast && hasAvailableSlotOnDate(dateStr, duration);
+
+      // 判斷是否整天被設計師設為店休
+      const blockedList = availability[dateStr] || [];
+      const isFullDayClosed = blockedList.length >= DAILY_TIME_SLOTS.length;
+
+      grid.push({
+        day: d,
         dateStr,
         isPast,
-        hasAvailableSlot
+        canBook,
+        isFullDayClosed
       });
     }
-    return days;
-  }, [currentMonth, selectedService, availability, appointments]);
+    return grid;
+  }, [calYear, calMonth, selectedService, availability, appointments, services]);
 
-  const isPhoneValid = /^09\d{2}-?\d{3}-?\d{3}$/.test(phone.trim());
+  // ==================== 客戶端送出預約 (含 Double Booking 檢核) ====================
+  const validatePhone = (val) => {
+    const clean = val.replace(/[-\s]/g, '');
+    return /^09\d{8}$/.test(clean);
+  };
 
-  const handleCustomerSubmit = (e) => {
+  const handleCreateAppointment = async (e) => {
     e.preventDefault();
     if (!customerName.trim()) {
-      showToast('欄位未填寫', '請輸入您的姓名', 'error');
+      alert('請輸入您的姓名');
       return;
     }
-    if (!isPhoneValid) {
-      showToast('電話格式錯誤', '請輸入正確的手機號碼格式（例如：0912-345-678）', 'error');
+    if (!validatePhone(phone)) {
+      setPhoneError('請輸入正確的台灣手機號碼格式（如 0912-345-678）');
       return;
     }
+    setPhoneError('');
+
     if (!selectedDate || !selectedTime) {
-      showToast('未選擇時段', '請先點選欲預約的日期與時間', 'error');
+      alert('請選擇預約日期與時段');
       return;
     }
 
-    const check = checkSlotBookable(selectedDate, selectedTime, selectedService.duration);
-    if (!check.ok) {
-      showToast('時段已被佔用', `無法預約：${check.reason}，請重新選擇其他時段。`, 'error');
+    // Double Booking 嚴格檢核：送出前再次驗證該時段與連續時長是否仍為空檔
+    const stillAvailable = isSlotBookable(selectedDate, selectedTime, selectedService.duration);
+    if (!stillAvailable) {
+      alert('抱歉！您選擇的時段剛剛已被預約或時長不足，請重新選擇時段。');
       setSelectedTime('');
       return;
     }
 
-    const endMins = timeToMins(selectedTime) + selectedService.duration;
-    const endTime = minsToTime(endMins);
+    setIsSubmitting(true);
+    const endTime = minutesToTime(timeToMinutes(selectedTime) + selectedService.duration);
 
-    const newAppt = {
-      id: `apt-${Date.now().toString().slice(-4)}`,
-      liffUserId: liffProfile.userId,
+    const newAppointment = {
+      id: `apt_${Date.now()}`,
+      liffUserId: liffProfile.userId || 'web_guest',
       customerName: customerName.trim(),
       phone: phone.trim(),
       serviceId: selectedService.id,
       date: selectedDate,
       time: selectedTime,
-      endTime,
+      endTime: endTime,
       status: 'pending',
       remark: remark.trim()
     };
 
-    setAppointments((prev) => [...prev, newAppt]);
-    sendBookingPendingMsg(newAppt, selectedService);
-    setBookingSuccessModal({ appt: newAppt, service: selectedService });
+    const nextAppointments = [...appointments, newAppointment];
+    setAppointments(nextAppointments);
+
+    // 同步資料庫並觸發 LINE「預約待確認」通知
+    await syncDatabase(services, nextAppointments, availability);
+    await sendBookingPendingMsg(newAppointment, selectedService);
+
+    setIsSubmitting(false);
     setSelectedTime('');
     setRemark('');
+    setCurrentView('my_bookings');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleConfirmAppointment = (appt) => {
-    const srv = services.find((s) => s.id === appt.serviceId) || { name: '美髮服務', duration: 60, price: 0 };
-    const slotsToLock = expandRequiredSlots(appt.time, srv.duration);
+  // ==================== 後台管理操作邏輯 ====================
+  // 確認預約：將所需時長轉化為 blockedSlots 鎖定日曆，並觸發 LINE「預約已確認」推播
+  const handleConfirmAppointment = async (apt) => {
+    const srv = services.find((s) => s.id === apt.serviceId);
+    const dur = srv ? srv.duration : 60;
+    const occupiedSlots = getOccupiedSlots(apt.time, dur);
 
-    const currentBlocked = getCombinedBlockedSlotsForDate(appt.date);
-    const conflict = slotsToLock.some((s) => currentBlocked.includes(s));
-    if (conflict) {
-      showToast('時段衝突警告', `該時段 (${appt.time}-${appt.endTime}) 與現有排程或店休重疊，請先協調或調整時段！`, 'error');
-      return;
+    // 更新訂單狀態為 confirmed
+    const nextAppointments = appointments.map((item) =>
+      item.id === apt.id ? { ...item, status: 'confirmed' } : item
+    );
+
+    // 將客人的服務時段寫入 Availability.blockedSlots 鎖定日曆
+    const prevBlocked = availability[apt.date] || [];
+    const mergedBlocked = Array.from(new Set([...prevBlocked, ...occupiedSlots])).sort();
+    const nextAvailability = {
+      ...availability,
+      [apt.date]: mergedBlocked
+    };
+
+    setAppointments(nextAppointments);
+    setAvailability(nextAvailability);
+
+    await sendBookingConfirmedMsg({ ...apt, status: 'confirmed' }, srv, nextAppointments, nextAvailability);
+    localStorage.setItem('hi_appointments', JSON.stringify(nextAppointments));
+    localStorage.setItem('hi_availability', JSON.stringify(nextAvailability));
+    alert(`✅ 已確認「${apt.customerName}」的預約，系統已鎖定 ${apt.date} (${apt.time}-${apt.endTime}) 時段並發送 LINE 確認通知！`);
+  };
+
+  // 變更訂單狀態 (完成 / 取消並釋放時段)
+  const handleChangeAppointmentStatus = async (apt, newStatus) => {
+    const srv = services.find((s) => s.id === apt.serviceId);
+    const dur = srv ? srv.duration : 60;
+    const occupiedSlots = getOccupiedSlots(apt.time, dur);
+
+    const nextAppointments = appointments.map((item) =>
+      item.id === apt.id ? { ...item, status: newStatus } : item
+    );
+
+    let nextAvailability = { ...availability };
+    // 若取消已確認的訂單，自動釋放該時段的 blockedSlots
+    if (newStatus === 'cancelled' && apt.status === 'confirmed') {
+      const prevBlocked = availability[apt.date] || [];
+      nextAvailability[apt.date] = prevBlocked.filter((s) => !occupiedSlots.includes(s));
     }
 
-    setAppointments((prev) =>
-      prev.map((item) => (item.id === appt.id ? { ...item, status: 'confirmed' } : item))
-    );
-
-    setAvailability((prev) => {
-      const existing = prev.find((a) => a.date === appt.date);
-      if (existing) {
-        const merged = Array.from(new Set([...existing.blockedSlots, ...slotsToLock])).sort();
-        return prev.map((a) => (a.date === appt.date ? { ...a, blockedSlots: merged } : a));
-      } else {
-        return [...prev, { date: appt.date, blockedSlots: slotsToLock }];
-      }
-    });
-
-    sendBookingConfirmedMsg(appt, srv);
+    setAppointments(nextAppointments);
+    setAvailability(nextAvailability);
+    await syncDatabase(services, nextAppointments, nextAvailability);
   };
 
-  const handleUpdateApptStatus = (apptId, newStatus) => {
-    setAppointments((prev) =>
-      prev.map((item) => (item.id === apptId ? { ...item, status: newStatus } : item))
-    );
-    showToast('訂單狀態已更新', `訂單 #${apptId} 已變更為 ${newStatus}`, 'info');
+  // Tab 2: 切換特定日期特定時段的「店休/不開放」狀態
+  const handleToggleBlockedSlot = async (dateStr, slot) => {
+    const currentBlocked = availability[dateStr] || [];
+    const isBlocked = currentBlocked.includes(slot);
+    const nextBlocked = isBlocked
+      ? currentBlocked.filter((s) => s !== slot)
+      : [...currentBlocked, slot].sort();
+
+    const nextAvailability = {
+      ...availability,
+      [dateStr]: nextBlocked
+    };
+    setAvailability(nextAvailability);
+    await syncDatabase(services, appointments, nextAvailability);
   };
 
-  const toggleManualBlockSlot = (dateStr, slotStr) => {
-    setAvailability((prev) => {
-      const existing = prev.find((a) => a.date === dateStr);
-      if (existing) {
-        const exists = existing.blockedSlots.includes(slotStr);
-        const updatedSlots = exists
-          ? existing.blockedSlots.filter((s) => s !== slotStr)
-          : [...existing.blockedSlots, slotStr].sort();
-        return prev.map((a) => (a.date === dateStr ? { ...a, blockedSlots: updatedSlots } : a));
-      } else {
-        return [...prev, { date: dateStr, blockedSlots: [slotStr] }];
-      }
-    });
+  // Tab 2: 一鍵切換整日店休
+  const handleToggleFullDayClosed = async (dateStr) => {
+    const currentBlocked = availability[dateStr] || [];
+    const isAllClosed = currentBlocked.length >= DAILY_TIME_SLOTS.length;
+    const nextAvailability = {
+      ...availability,
+      [dateStr]: isAllClosed ? [] : [...DAILY_TIME_SLOTS]
+    };
+    setAvailability(nextAvailability);
+    await syncDatabase(services, appointments, nextAvailability);
   };
 
-  const toggleWholeDayOff = (dateStr, lockAll) => {
-    setAvailability((prev) => {
-      const existing = prev.find((a) => a.date === dateStr);
-      const targetSlots = lockAll ? [...ALL_DAILY_SLOTS] : [];
-      if (existing) {
-        return prev.map((a) => (a.date === dateStr ? { ...a, blockedSlots: targetSlots } : a));
-      } else {
-        return [...prev, { date: dateStr, blockedSlots: targetSlots }];
-      }
-    });
-    showToast(
-      lockAll ? '已設為全日店休' : '已解除全日店休',
-      `${dateStr} 時段狀態已更新`,
-      'info'
-    );
-  };
-
-  const handleSaveService = (e) => {
+  // Tab 3: 服務項目 CRUD
+  const handleSaveService = async (e) => {
     e.preventDefault();
-    if (!newServiceForm.name.trim() || !newServiceForm.price) return;
+    if (!editingService.name.trim() || !editingService.price) return;
 
-    if (editingService) {
-      setServices((prev) =>
-        prev.map((s) =>
-          s.id === editingService.id
-            ? {
-                ...s,
-                name: newServiceForm.name.trim(),
-                price: Number(newServiceForm.price),
-                duration: Number(newServiceForm.duration),
-                desc: newServiceForm.desc.trim()
-              }
-            : s
-        )
+    let nextServices;
+    if (editingService.id) {
+      nextServices = services.map((s) =>
+        s.id === editingService.id
+          ? { ...editingService, price: Number(editingService.price), duration: Number(editingService.duration) }
+          : s
       );
-      setEditingService(null);
-      showToast('服務項目已更新', `已儲存「${newServiceForm.name}」的設定`, 'info');
     } else {
-      const created = {
-        id: `srv-${Date.now().toString().slice(-4)}`,
-        name: newServiceForm.name.trim(),
-        price: Number(newServiceForm.price),
-        duration: Number(newServiceForm.duration),
-        desc: newServiceForm.desc.trim() || '專屬客製化美髮與頭皮養護服務'
+      const newSrv = {
+        id: `srv_${Date.now()}`,
+        name: editingService.name.trim(),
+        price: Number(editingService.price),
+        duration: Number(editingService.duration)
       };
-      setServices((prev) => [...prev, created]);
-      showToast('新增服務成功', `已新增「${created.name}」`, 'info');
+      nextServices = [...services, newSrv];
     }
-    setNewServiceForm({ name: '', price: '', duration: 60, desc: '' });
+
+    setServices(nextServices);
+    setEditingService({ id: '', name: '', price: '', duration: 60 });
+    await syncDatabase(nextServices, appointments, availability);
   };
 
-  const handleDeleteService = (srvId) => {
+  const handleDeleteService = async (id) => {
     if (services.length <= 1) {
-      showToast('無法刪除', '系統至少需保留一項服務項目', 'error');
+      alert('請至少保留一項服務品項');
       return;
     }
-    setServices((prev) => prev.filter((s) => s.id !== srvId));
-    if (selectedServiceId === srvId) {
-      const remaining = services.filter((s) => s.id !== srvId);
-      if (remaining[0]) setSelectedServiceId(remaining[0].id);
-    }
-    showToast('已刪除服務', '該服務項目已從資料庫移除', 'info');
+    const nextServices = services.filter((s) => s.id !== id);
+    setServices(nextServices);
+    if (selectedServiceId === id) setSelectedServiceId(nextServices[0].id);
+    await syncDatabase(nextServices, appointments, availability);
   };
+
+  // 連點 5 下品牌 Logo 可快速切換設計師後台（方便電腦端管理與測試）
+  const handleSecretAdminTrigger = () => {
+    const next = logoClickCount + 1;
+    setLogoClickCount(next);
+    if (next >= 5) {
+      setIsAdmin(true);
+      setCurrentView('admin');
+      setLogoClickCount(0);
+    }
+  };
+
+  // 排序後的訂單列表（依日期與時間由近到遠排序）
+  const sortedAppointments = useMemo(() => {
+    return [...appointments].sort((a, b) => {
+      const dtA = `${a.date} ${a.time}`;
+      const dtB = `${b.date} ${b.time}`;
+      return dtA.localeCompare(dtB);
+    });
+  }, [appointments]);
+
+  // 客戶個人的預約列表
+  const customerAppointments = useMemo(() => {
+    return sortedAppointments.filter(
+      (a) =>
+        (liffProfile.userId && a.liffUserId === liffProfile.userId) ||
+        (customerName && a.customerName === customerName)
+    );
+  }, [sortedAppointments, liffProfile.userId, customerName]);
 
   return (
-    <div className="min-h-screen bg-[#F7F4EF] text-[#2C2520] font-sans selection:bg-[#6E5039] selection:text-white pb-16">
-      <div className="sticky top-0 z-40 bg-[#2C2520] text-[#EBE5DC] px-4 py-2.5 shadow-md border-b border-[#4A3C31]">
-        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#38B449] animate-pulse" />
-            <span className="text-xs tracking-widest uppercase text-[#C8B9A6]">
-              HAIR ISLAND SALON · SPA & LIFF SYSTEM
-            </span>
+    <div className="min-h-screen bg-[#F7F4EF] text-[#2C2520] font-sans pb-16 selection:bg-[#8C6D53] selection:text-white">
+      <div className="max-w-md mx-auto px-5 pt-6">
+        
+        {/* ==================== 頂部品牌導覽列 (Header) ==================== */}
+        <header className="flex items-center justify-between mb-8">
+          <div
+            onClick={handleSecretAdminTrigger}
+            className="flex items-center gap-3 cursor-pointer select-none"
+          >
+            {/* 極簡胡桃木質調品牌圓章 */}
+            <div className="w-12 h-12 rounded-full bg-[#3A2E26] text-[#F7F4EF] flex flex-col items-center justify-center shadow-sm border border-[#C8B9A6]">
+              <span className="text-sm font-serif tracking-widest font-semibold">髮嶼</span>
+              <span className="text-[7px] tracking-widest text-[#D5C7B8] uppercase">Hair Island</span>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-wider text-[#2C2520]">髮嶼 HAIR ISLAND</h1>
+              <p className="text-xs text-[#7D7168] tracking-wide">極簡木質・專屬頭皮養護與美髮</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* 視圖切換膠囊按鈕 */}
+          <div className="flex bg-[#EAE3DA] p-1 rounded-full text-xs font-medium">
             <button
-              onClick={() => setActiveView('customer')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
-                activeView === 'customer'
-                  ? 'bg-[#C8B9A6] text-[#2C2520] shadow-sm'
-                  : 'text-[#C8B9A6] hover:bg-[#3E342D]'
+              type="button"
+              onClick={() => setCurrentView('customer')}
+              className={`px-3.5 py-1.5 rounded-full transition-all ${
+                currentView === 'customer'
+                  ? 'bg-white text-[#2C2520] shadow-sm font-semibold'
+                  : 'text-[#7D7168]'
               }`}
             >
-              客戶端預約介面 (LIFF View)
+              預約
             </button>
             <button
-              onClick={() => setActiveView('admin')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
-                activeView === 'admin'
-                  ? 'bg-[#C8B9A6] text-[#2C2520] shadow-sm'
-                  : 'text-[#C8B9A6] hover:bg-[#3E342D]'
+              type="button"
+              onClick={() => setCurrentView('my_bookings')}
+              className={`px-3.5 py-1.5 rounded-full transition-all ${
+                currentView === 'my_bookings'
+                  ? 'bg-white text-[#2C2520] shadow-sm font-semibold'
+                  : 'text-[#7D7168]'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              設計師後台管理 (Admin)
+              我的訂單
             </button>
-          </div>
-        </div>
-      </div>
-
-      {toast && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-[#2C2520] text-[#F7F4EF] border border-[#6E5039] rounded-2xl p-4 shadow-2xl transition-all duration-300">
-          <div className="flex items-start gap-3">
-            {toast.type === 'line' ? (
-              <div className="w-8 h-8 rounded-xl bg-[#06C755] flex items-center justify-center shrink-0 text-white font-bold text-xs">
-                LINE
-              </div>
-            ) : toast.type === 'error' ? (
-              <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-            ) : (
-              <CheckCircle2 className="w-5 h-5 text-[#C8B9A6] shrink-0 mt-0.5" />
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setCurrentView('admin')}
+                className={`px-3 py-1.5 rounded-full transition-all ${
+                  currentView === 'admin'
+                    ? 'bg-[#3A2E26] text-white shadow-sm font-semibold'
+                    : 'text-[#5C4938]'
+                }`}
+              >
+                後台
+              </button>
             )}
-            <div className="flex-1 text-xs leading-relaxed">
-              <div className="font-semibold text-sm text-white mb-0.5">{toast.title}</div>
-              <div className="text-[#D5CBBF]">{toast.message}</div>
-            </div>
-            <button onClick={() => setToast(null)} className="text-[#9A8C7E] hover:text-white">
-              <X className="w-4 h-4" />
-            </button>
           </div>
-        </div>
-      )}
+        </header>
 
-      {activeView === 'customer' && (
-        <div className="max-w-3xl mx-auto px-4 pt-8">
-          <header className="bg-[#EFECE6] border border-[#DFD8CE] rounded-3xl p-8 md:p-10 mb-8 relative overflow-hidden shadow-sm">
-            <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
-              <div className="text-center md:text-left">
-                <div className="inline-flex items-center gap-4 mb-4">
-                  <div className="w-16 h-16 rounded-2xl bg-[#2C2520] text-[#EBE5DC] flex items-center justify-center shadow-md border border-[#5A4635]">
-                    <svg viewBox="0 0 64 64" className="w-11 h-11 stroke-current fill-none" strokeWidth="1.8">
-                      <circle cx="22" cy="20" r="6" />
-                      <path d="M38 16 Q42 12 46 16 Q50 12 54 16" strokeLinecap="round" />
-                      <path d="M12 44 Q28 34 48 44" strokeLinecap="round" />
-                      <path d="M10 51 Q30 41 52 51" strokeLinecap="round" />
-                      <circle cx="46" cy="30" r="3" />
-                      <path d="M43 28 L33 22 M43 32 L33 36" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h1 className="text-2xl md:text-3xl font-serif tracking-[0.2em] text-[#2C2520] font-semibold">
-                      髮嶼
-                    </h1>
-                    <p className="text-xs tracking-[0.28em] text-[#7A6855] uppercase mt-1">
-                      HAIR ISLAND SALON
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-sm text-[#5C4E41] leading-relaxed max-w-lg">
-                  在溫潤胡桃木與靜謐留白之間，為您預留一段不被打擾的島嶼時光。專注於深層頭皮養護與自然鬆弛感髮型設計。
-                </p>
-              </div>
-
-              <div className="bg-[#F7F4EF] border border-[#DFD8CE] rounded-2xl p-4 text-xs w-full md:w-60 shrink-0">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-[#5C4E41] flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#06C755]" />
-                    LINE LIFF 已連線
-                  </span>
-                  <button
-                    type="button"
-                    onClick={initLiff}
-                    className="text-[11px] text-[#6E5039] underline hover:text-[#2C2520]"
-                  >
-                    重新取得 Profile
-                  </button>
-                </div>
-                <div className="text-[#7A6855] truncate">UID: {liffProfile.userId}</div>
-                <div className="text-[#2C2520] font-medium mt-0.5">暱稱：{liffProfile.displayName}</div>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-5 border-t border-[#DFD8CE] grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-[#6E5D4F]">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-[#6E5039] shrink-0" />
-                <span>營業時間：11:00 - 19:00（全預約制）</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#6E5039] shrink-0" />
-                <span>一對一專屬服務，座位保留 15 分鐘</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-[#6E5039] shrink-0" />
-                <span>送出後將由設計師確認並以 LINE 通知</span>
-              </div>
-            </div>
-          </header>
-
-          <form onSubmit={handleCustomerSubmit} className="space-y-8">
-            <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
-              <div className="flex items-center gap-3 mb-5">
-                <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
-                  01
+        {/* ==================== VIEW 1: 客戶端預約介面 ==================== */}
+        {currentView === 'customer' && (
+          <div className="space-y-6">
+            
+            {/* 歡迎訊息與品牌留白標語 */}
+            <section className="bg-white/80 backdrop-blur rounded-2xl p-6 border border-[#E6DFD5] shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-semibold tracking-widest uppercase text-[#8C6D53]">
+                  ONLINE RESERVATION
                 </span>
-                <div>
-                  <h2 className="text-base font-semibold tracking-wider text-[#2C2520]">貴賓聯絡資訊</h2>
-                  <p className="text-xs text-[#8A7968]">預設帶入您的 LINE 顯示名稱，可直接修改為真實姓名</p>
+                {liffProfile.displayName && (
+                  <span className="text-xs bg-[#F2ECE4] text-[#5C4938] px-2.5 py-1 rounded-full font-medium">
+                    Hi, {liffProfile.displayName} 貴賓
+                  </span>
+                )}
+              </div>
+              <h2 className="text-2xl font-bold text-[#2C2520] leading-snug mb-2">
+                留一段靜謐時光，<br />給需要深度放鬆的自己。
+              </h2>
+              <p className="text-xs text-[#7D7168] leading-relaxed mb-5">
+                選擇服務與日期，系統將依據服務時長自動為您篩選尚可預約的空檔。
+              </p>
+
+              {/* 預約須知 */}
+              <div className="bg-[#FAF8F5] rounded-xl p-4 border border-[#EFE9E0]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-[#3A2E26] tracking-wide">預約須知</span>
+                  <span className="text-[11px] text-[#8C6D53] bg-[#EFE9E0] px-2 py-0.5 rounded">
+                    預約前請詳閱
+                  </span>
                 </div>
+                <ul className="text-xs text-[#60564F] space-y-1.5 leading-relaxed">
+                  <li>・全店採一對一專屬預約制，營業時間為 11:00 - 19:00。</li>
+                  <li>・預約送出後為「待確認」狀態，設計師確認後將透過 LINE 通知。</li>
+                  <li>・當日保留 10 分鐘，如需更改或取消請提前於官方 LINE 告知。</li>
+                </ul>
+              </div>
+            </section>
+
+            {/* Step 1: 聯絡資訊 */}
+            <section className="bg-white rounded-2xl p-6 border border-[#E6DFD5] shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-[#2C2520]">Step 1. 聯絡資訊</h3>
+                <span className="text-[11px] text-[#8C6D53] font-medium">自動帶入 LINE 暱稱</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-[#5C4E41] mb-2">
-                    預約姓名 <span className="text-red-500">*</span>
+                  <label className="block text-xs font-semibold text-[#5C4938] mb-1.5">
+                    貴賓姓名 <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-[#9A8C7E] absolute left-3.5 top-3" />
-                    <input
-                      type="text"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="請輸入您的稱呼"
-                      className="w-full pl-10 pr-4 py-2.5 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-sm focus:outline-none focus:border-[#6E5039]"
-                      required
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="請輸入您的姓名"
+                    className="w-full h-11 px-3.5 rounded-xl border border-[#D8CFC4] bg-[#FDFCFB] text-sm text-[#2C2520] focus:outline-none focus:border-[#8C6D53]"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-[#5C4E41] mb-2">
-                    聯絡電話 (台灣手機格式) <span className="text-red-500">*</span>
+                  <label className="block text-xs font-semibold text-[#5C4938] mb-1.5">
+                    聯絡電話 <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-[#9A8C7E] absolute left-3.5 top-3" />
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0912-345-678"
-                      className={`w-full pl-10 pr-4 py-2.5 bg-[#FAF8F5] border rounded-xl text-sm focus:outline-none ${
-                        phone && !isPhoneValid
-                          ? 'border-red-400 focus:border-red-500'
-                          : 'border-[#DCD3C6] focus:border-[#6E5039]'
-                      }`}
-                      required
-                    />
-                  </div>
-                  {phone && !isPhoneValid && (
-                    <p className="text-[11px] text-red-500 mt-1">請輸入正確的 09 開頭十碼手機號碼</p>
-                  )}
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (phoneError) setPhoneError('');
+                    }}
+                    placeholder="0912-345-678"
+                    className={`w-full h-11 px-3.5 rounded-xl border ${
+                      phoneError ? 'border-red-400' : 'border-[#D8CFC4]'
+                    } bg-[#FDFCFB] text-sm text-[#2C2520] focus:outline-none focus:border-[#8C6D53]`}
+                  />
+                  {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
                 </div>
               </div>
             </section>
 
-            <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-3">
-                  <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
-                    02
-                  </span>
-                  <div>
-                    <h2 className="text-base font-semibold tracking-wider text-[#2C2520]">選擇專屬養護或造型項目</h2>
-                    <p className="text-xs text-[#8A7968]">系統將依據您所選服務的預估時長，自動篩選合適的連續空檔</p>
-                  </div>
-                </div>
+            {/* Step 2: 服務選擇 (串接 Services 資料庫渲染，顯示名稱、價格、預估時長) */}
+            <section className="bg-white rounded-2xl p-6 border border-[#E6DFD5] shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-[#2C2520]">Step 2. 服務選擇</h3>
+                <span className="text-[11px] text-[#8C6D53] bg-[#F2ECE4] px-2.5 py-0.5 rounded-full font-medium">
+                  自動計算所需時段
+                </span>
               </div>
 
-              <div className="grid grid-cols-1 gap-3.5">
+              <div className="space-y-2.5">
                 {services.map((srv) => {
-                  const isSelected = srv.id === selectedServiceId;
+                  const isSelected = selectedService?.id === srv.id;
                   return (
                     <div
                       key={srv.id}
                       onClick={() => {
                         setSelectedServiceId(srv.id);
-                        setSelectedTime('');
+                        setSelectedTime(''); // 切換服務時重設時間以重新檢核時長
                       }}
-                      className={`cursor-pointer rounded-2xl p-4 border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                         isSelected
-                          ? 'bg-[#F3EFE6] border-[#6E5039] shadow-sm'
-                          : 'bg-[#FAF8F5] border-[#E6DFD3] hover:border-[#C8B9A6]'
+                          ? 'border-[#5C4938] bg-[#FAF6F1] shadow-sm'
+                          : 'border-[#E6DFD5] bg-white hover:border-[#C8B9A6]'
                       }`}
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                              isSelected ? 'border-[#6E5039] bg-[#6E5039]' : 'border-[#B0A191]'
-                            }`}
-                          >
-                            {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                          </div>
-                          <span className="font-medium text-sm text-[#2C2520]">{srv.name}</span>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#E5DEC9] text-[#5C4E41]">
-                            約 {srv.duration} 分鐘
-                          </span>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                            isSelected
+                              ? 'border-[#3A2E26] bg-[#3A2E26] text-white'
+                              : 'border-[#C8B9A6] bg-white'
+                          }`}
+                        >
+                          {isSelected && <span className="text-[10px]">✓</span>}
                         </div>
-                        <p className="text-xs text-[#7A6855] pl-6">{srv.desc}</p>
+                        <div>
+                          <div className="text-sm font-bold text-[#2C2520]">{srv.name}</div>
+                          <div className="text-xs text-[#8C7A6B]">預估時長：{srv.duration} 分鐘</div>
+                        </div>
                       </div>
-                      <div className="pl-6 sm:pl-0 text-right shrink-0">
-                        <span className="text-base font-semibold text-[#6E5039]">
-                          NT$ {srv.price.toLocaleString()}
-                        </span>
-                      </div>
+                      <div className="text-sm font-bold text-[#5C4938]">NT$ {srv.price}</div>
                     </div>
                   );
                 })}
               </div>
             </section>
 
-            <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
-                  03
+            {/* Step 3: 日期與時間選擇 */}
+            <section className="bg-white rounded-2xl p-6 border border-[#E6DFD5] shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-[#2C2520]">Step 3. 日期與時間</h3>
+                <span className="text-[11px] text-[#8C6D53] font-medium">
+                  營業時間 11:00 - 19:00
                 </span>
-                <div>
-                  <h2 className="text-base font-semibold tracking-wider text-[#2C2520]">選擇預約日期與時段</h2>
-                  <p className="text-xs text-[#8A7968]">
-                    目前選擇：<strong className="text-[#6E5039]">{selectedService.name}</strong>（需保留連續{' '}
-                    <strong className="text-[#6E5039]">{selectedService.duration} 分鐘</strong> 空檔）
-                  </p>
-                </div>
               </div>
 
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-4 px-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
+              {/* 月曆切換列 */}
+              <div className="flex items-center justify-between mb-4 px-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (calMonth === 0) {
+                      setCalYear(calYear - 1);
+                      setCalMonth(11);
+                    } else {
+                      setCalMonth(calMonth - 1);
                     }
-                    className="p-2 rounded-xl hover:bg-[#EFECE6] text-[#5C4E41]"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <div className="text-sm font-semibold tracking-widest text-[#2C2520]">
-                    {currentMonth.getFullYear()} 年 {currentMonth.getMonth() + 1} 月
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
+                  }}
+                  className="w-8 h-8 rounded-full border border-[#E6DFD5] flex items-center justify-center text-[#5C4938] hover:bg-[#FAF6F1]"
+                >
+                  ‹
+                </button>
+                <span className="text-base font-bold tracking-wider text-[#2C2520]">
+                  {calYear} 年 {calMonth + 1} 月
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (calMonth === 11) {
+                      setCalYear(calYear + 1);
+                      setCalMonth(0);
+                    } else {
+                      setCalMonth(calMonth + 1);
                     }
-                    className="p-2 rounded-xl hover:bg-[#EFECE6] text-[#5C4E41]"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+                  }}
+                  className="w-8 h-8 rounded-full border border-[#E6DFD5] flex items-center justify-center text-[#5C4938] hover:bg-[#FAF6F1]"
+                >
+                  ›
+                </button>
+              </div>
 
-                <div className="grid grid-cols-7 gap-1.5 text-center text-xs text-[#8A7968] mb-2">
-                  {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
-                    <div key={d} className="py-1 font-medium">
-                      {d}
-                    </div>
-                  ))}
-                </div>
+              {/* 星期標頭 */}
+              <div className="grid grid-cols-7 text-center text-xs text-[#8C7A6B] font-medium mb-2">
+                <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+              </div>
 
-                <div className="grid grid-cols-7 gap-1.5">
-                  {calendarDays.map((cell, idx) => {
-                    if (!cell) return <div key={`empty-${idx}`} className="h-16" />;
+              {/* 月曆網格 */}
+              <div className="grid grid-cols-7 gap-1.5 text-center mb-6">
+                {calendarDays.map((item, idx) => {
+                  if (!item) return <div key={`empty-${idx}`} />;
+                  const isSelected = selectedDate === item.dateStr;
 
-                    const isSelected = cell.dateStr === selectedDate;
-                    const disabled = cell.isPast || !cell.hasAvailableSlot;
-
+                  if (item.isPast) {
                     return (
-                      <button
-                        type="button"
-                        key={cell.dateStr}
-                        disabled={disabled}
-                        onClick={() => {
-                          setSelectedDate(cell.dateStr);
-                          setSelectedTime('');
-                        }}
-                        className={`h-16 rounded-2xl border p-1.5 flex flex-col items-center justify-between transition-all ${
-                          cell.isPast
-                            ? 'bg-[#F2EFE9] border-transparent text-[#BEB5A9] cursor-not-allowed opacity-60'
-                            : !cell.hasAvailableSlot
-                            ? 'bg-[#F5EFEB] border-[#E8DFD7] text-[#B09B8C] cursor-not-allowed'
-                            : isSelected
-                            ? 'bg-[#6E5039] border-[#6E5039] text-white shadow-md'
-                            : 'bg-[#FAF8F5] border-[#E6DFD3] text-[#2C2520] hover:border-[#6E5039]'
+                      <div
+                        key={item.dateStr}
+                        className="h-14 rounded-xl flex flex-col items-center justify-center text-[#D0C8C0] bg-transparent cursor-not-allowed select-none"
+                      >
+                        <span className="text-sm">{item.day}</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <button
+                      type="button"
+                      key={item.dateStr}
+                      disabled={!item.canBook}
+                      onClick={() => {
+                        setSelectedDate(item.dateStr);
+                        setSelectedTime('');
+                      }}
+                      className={`h-14 rounded-xl flex flex-col items-center justify-center transition-all border ${
+                        isSelected
+                          ? 'bg-[#3A2E26] text-white border-[#3A2E26] shadow-sm'
+                          : item.canBook
+                          ? 'bg-[#FDFCFB] text-[#2C2520] border-[#E6DFD5] hover:border-[#8C6D53]'
+                          : 'bg-[#F5EBEB] text-[#A66A6A] border-transparent cursor-not-allowed'
+                      }`}
+                    >
+                      <span className="text-sm font-semibold leading-none">{item.day}</span>
+                      <span
+                        className={`text-[9px] mt-1 font-medium ${
+                          isSelected
+                            ? 'text-[#E6DFD5]'
+                            : item.canBook
+                            ? 'text-[#4F775E]'
+                            : 'text-[#A66A6A]'
                         }`}
                       >
-                        <span className="text-xs font-semibold">{cell.dayNumber}</span>
-                        {!cell.isPast && (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded-full leading-none ${
-                              !cell.hasAvailableSlot
-                                ? 'bg-[#E5D7CE] text-[#8C6D58]'
-                                : isSelected
-                                ? 'bg-white/20 text-white'
-                                : 'bg-[#E6EFE6] text-[#3B6E4C]'
-                            }`}
-                          >
-                            {cell.hasAvailableSlot ? '可預約' : '已額滿'}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                        {item.isFullDayClosed ? '店休' : item.canBook ? '可預約' : '已額滿'}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
-              {selectedDate && (
-                <div className="pt-5 border-t border-[#ECE6DA]">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                    <span className="text-xs font-medium text-[#5C4E41]">
-                      選擇起始時間（{selectedDate} 營業時段 11:00 - 19:00）
-                    </span>
-                    <span className="text-[11px] text-[#8A7968]">
-                      反灰代表已預約、店休，或剩餘連續時間不足 {selectedService.duration} 分鐘
-                    </span>
-                  </div>
+              {/* 展開 11:00 至 19:00 時段按鈕 */}
+              <div className="border-t border-[#EFE9E0] pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-[#3A2E26]">
+                    選擇起始時段（服務需時 {selectedService?.duration} 分鐘）
+                  </span>
+                  {selectedDate && (
+                    <span className="text-xs text-[#8C6D53] font-medium">{selectedDate}</span>
+                  )}
+                </div>
 
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
-                    {ALL_DAILY_SLOTS.map((slot) => {
-                      const check = checkSlotBookable(selectedDate, slot, selectedService.duration);
+                {!selectedDate ? (
+                  <div className="bg-[#FAF8F5] rounded-xl py-4 text-center text-xs text-[#8C7A6B]">
+                    請先點選上方月曆中「可預約」的日期
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {DAILY_TIME_SLOTS.map((slot) => {
+                      const bookable = isSlotBookable(
+                        selectedDate,
+                        slot,
+                        selectedService ? selectedService.duration : 60
+                      );
                       const isSelected = selectedTime === slot;
+
                       return (
                         <button
                           type="button"
                           key={slot}
-                          disabled={!check.ok}
+                          disabled={!bookable}
                           onClick={() => setSelectedTime(slot)}
-                          className={`py-2.5 px-2 rounded-xl border text-xs font-medium transition-all flex flex-col items-center justify-center ${
-                            !check.ok
-                              ? 'bg-[#F2EFE9] border-[#E5DEC9] text-[#BEB5A9] cursor-not-allowed line-through'
-                              : isSelected
-                              ? 'bg-[#6E5039] border-[#6E5039] text-white shadow-sm'
-                              : 'bg-[#FAF8F5] border-[#DCD3C6] text-[#2C2520] hover:border-[#6E5039]'
+                          className={`py-2.5 rounded-xl text-xs font-semibold transition-all border ${
+                            isSelected
+                              ? 'bg-[#3A2E26] text-white border-[#3A2E26] shadow-sm'
+                              : bookable
+                              ? 'bg-white text-[#2C2520] border-[#D8CFC4] hover:border-[#8C6D53]'
+                              : 'bg-[#F2EFEA] text-[#C2B9B0] border-transparent line-through cursor-not-allowed'
                           }`}
-                          title={check.reason}
                         >
-                          <span>{slot}</span>
-                          {!check.ok && (
-                            <span className="text-[9px] no-underline mt-0.5 opacity-80">{check.reason}</span>
-                          )}
+                          {slot}
                         </button>
                       );
                     })}
                   </div>
-
-                  {selectedTime && (
-                    <div className="mt-4 bg-[#F3EFE6] border border-[#D8CBB8] rounded-2xl p-3.5 flex items-center justify-between text-xs text-[#4A3C31]">
-                      <span>
-                        已選擇時段：
-                        <strong className="ml-1 text-[#2C2520]">
-                          {selectedDate} {selectedTime} ～{' '}
-                          {minsToTime(timeToMins(selectedTime) + selectedService.duration)}
-                        </strong>
-                      </span>
-                      <span className="text-[#6E5039] font-medium">共計 {selectedService.duration} 分鐘</span>
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </section>
 
-            <section className="bg-white/90 border border-[#E5DEC9] rounded-3xl p-6 md:p-8 shadow-sm">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="w-7 h-7 rounded-full bg-[#6E5039] text-white text-xs flex items-center justify-center font-medium">
-                  04
-                </span>
-                <div>
-                  <h2 className="text-base font-semibold tracking-wider text-[#2C2520]">需求備註與送出預約</h2>
-                  <p className="text-xs text-[#8A7968]">如有近期染燙紀錄、頭皮敏感狀況或指定造型需求，歡迎預先填寫</p>
-                </div>
+            {/* Step 4: 備註與送出 */}
+            <form
+              onSubmit={handleCreateAppointment}
+              className="bg-white rounded-2xl p-6 border border-[#E6DFD5] shadow-sm space-y-4"
+            >
+              <h3 className="text-base font-bold text-[#2C2520]">Step 4. 備註與確認送出</h3>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#5C4938] mb-1.5">
+                  備註事項（選填）
+                </label>
+                <textarea
+                  rows="3"
+                  value={remark}
+                  onChange={(e) => setRemark(e.target.value)}
+                  placeholder="例如：近期是否有染燙紀錄、希望加強頭皮放鬆等..."
+                  className="w-full p-3.5 rounded-xl border border-[#D8CFC4] bg-[#FDFCFB] text-sm text-[#2C2520] focus:outline-none focus:border-[#8C6D53] resize-none"
+                />
               </div>
 
-              <textarea
-                rows={3}
-                value={remark}
-                onChange={(e) => setRemark(e.target.value)}
-                placeholder="例如：近期頭皮較乾癢、希望討論好整理的鎖骨髮長..."
-                className="w-full p-3.5 bg-[#FAF8F5] border border-[#DCD3C6] rounded-2xl text-sm focus:outline-none focus:border-[#6E5039] mb-5"
-              />
+              {/* 預約摘要預覽 */}
+              {selectedDate && selectedTime && selectedService && (
+                <div className="bg-[#FAF6F1] p-4 rounded-xl border border-[#E6DFD5] text-xs space-y-1 text-[#4A3E35]">
+                  <div className="font-bold text-[#2C2520] mb-1">📌 您的預約明細預覽：</div>
+                  <div>・預約項目：{selectedService.name} (NT$ {selectedService.price})</div>
+                  <div>
+                    ・預約時段：{selectedDate} {selectedTime} -{' '}
+                    {minutesToTime(timeToMinutes(selectedTime) + selectedService.duration)}（共{' '}
+                    {selectedService.duration} 分鐘）
+                  </div>
+                </div>
+              )}
 
               <button
                 type="submit"
-                className="w-full py-4 rounded-2xl bg-[#2C2520] hover:bg-[#423730] text-[#F7F4EF] font-medium text-sm tracking-widest transition-all shadow-md flex items-center justify-center gap-2"
+                disabled={isSubmitting || !selectedDate || !selectedTime}
+                className={`w-full h-12 rounded-xl text-sm font-bold tracking-wider transition-all ${
+                  isSubmitting || !selectedDate || !selectedTime
+                    ? 'bg-[#C8B9A6] text-white cursor-not-allowed'
+                    : 'bg-[#3A2E26] text-white hover:bg-[#2C2520] shadow-md'
+                }`}
               >
-                <CheckCircle2 className="w-4 h-4 text-[#C8B9A6]" />
-                確認預約並發送 LINE 通知
+                {isSubmitting ? '檢核時段並傳送預約中...' : '確認預約'}
               </button>
-            </section>
-          </form>
-        </div>
-      )}
-
-      {bookingSuccessModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#F7F4EF] border border-[#D8CBB8] rounded-3xl max-w-md w-full p-7 shadow-2xl">
-            <div className="w-12 h-12 rounded-2xl bg-[#6E5039] text-white flex items-center justify-center mx-auto mb-4">
-              <Check className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-semibold text-center text-[#2C2520] mb-1">
-              預約申請已送出（待設計師確認）
-            </h3>
-            <p className="text-xs text-center text-[#7A6855] mb-5">
-              系統已透過 LINE LIFF 傳送「預約待確認」通知至您的聊天室
-            </p>
-
-            <div className="bg-white rounded-2xl p-4 border border-[#E5DEC9] space-y-2 text-xs text-[#4A3C31] mb-6">
-              <div className="flex justify-between">
-                <span className="text-[#8A7968]">預約單號</span>
-                <span className="font-mono font-medium">{bookingSuccessModal.appt.id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#8A7968]">貴賓姓名</span>
-                <span className="font-medium">{bookingSuccessModal.appt.customerName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#8A7968]">預約服務</span>
-                <span className="font-medium text-[#6E5039]">{bookingSuccessModal.service.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#8A7968]">預約時段</span>
-                <span className="font-medium">
-                  {bookingSuccessModal.appt.date} {bookingSuccessModal.appt.time} -{' '}
-                  {bookingSuccessModal.appt.endTime}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex gap-2.5">
-              <button
-                onClick={() => setBookingSuccessModal(null)}
-                className="flex-1 py-2.5 rounded-xl border border-[#C8B9A6] text-xs font-medium text-[#5C4E41] hover:bg-[#EFECE6]"
-              >
-                返回預約首頁
-              </button>
-              <button
-                onClick={() => {
-                  setBookingSuccessModal(null);
-                  setActiveView('admin');
-                  setIsAdminAuthenticated(true);
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-[#6E5039] text-white text-xs font-medium hover:bg-[#593F2C]"
-              >
-                前往後台審核此單
-              </button>
-            </div>
+            </form>
           </div>
-        </div>
-      )}
+        )}
 
-      {activeView === 'admin' && (
-        <div className="max-w-5xl mx-auto px-4 pt-8">
-          {!isAdminAuthenticated ? (
-            <div className="max-w-md mx-auto bg-white border border-[#E5DEC9] rounded-3xl p-8 shadow-sm mt-8">
-              <div className="w-12 h-12 rounded-2xl bg-[#2C2520] text-[#C8B9A6] flex items-center justify-center mb-4">
-                <Lock className="w-5 h-5" />
+        {/* ==================== 客戶端：我的預約訂單檢視 ==================== */}
+        {currentView === 'my_bookings' && (
+          <div className="bg-white rounded-2xl p-6 border border-[#E6DFD5] shadow-sm space-y-4">
+            <h2 className="text-lg font-bold text-[#2C2520]">我的預約紀錄</h2>
+            {customerAppointments.length === 0 ? (
+              <div className="text-center py-10 text-xs text-[#8C7A6B]">
+                尚無您的預約紀錄
               </div>
-              <h2 className="text-lg font-semibold text-[#2C2520] mb-1">髮嶼設計師後台管理登入</h2>
-              <p className="text-xs text-[#8A7968] mb-5">
-                請輸入管理員通行碼以管理預約訂單、店休時段與價目表（預設測試密碼：8888，或直接點擊快速登入）
-              </p>
+            ) : (
+              <div className="space-y-3">
+                {customerAppointments.map((apt) => {
+                  const srv = services.find((s) => s.id === apt.serviceId);
+                  const statusBadge = {
+                    pending: { label: '待設計師確認', cls: 'bg-amber-100 text-amber-800' },
+                    confirmed: { label: '已確認預約', cls: 'bg-emerald-100 text-emerald-800' },
+                    completed: { label: '已完成服務', cls: 'bg-stone-200 text-stone-700' },
+                    cancelled: { label: '已取消', cls: 'bg-rose-100 text-rose-700' }
+                  }[apt.status] || { label: apt.status, cls: 'bg-gray-100' };
 
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (adminPinInput === '8888' || adminPinInput === '') {
-                    setIsAdminAuthenticated(true);
-                    showToast('後台登入成功', '歡迎回來，髮嶼主理人', 'info');
-                  } else {
-                    showToast('密碼錯誤', '請輸入預設密碼 8888', 'error');
-                  }
-                }}
-                className="space-y-4"
+                  return (
+                    <div
+                      key={apt.id}
+                      className="p-4 rounded-xl border border-[#E6DFD5] bg-[#FAF8F5] text-xs space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-[#2C2520]">
+                          {apt.date} ({apt.time} - {apt.endTime})
+                        </span>
+                        <span className={`px-2.5 py-0.5 rounded-full font-semibold ${statusBadge.cls}`}>
+                          {statusBadge.label}
+                        </span>
+                      </div>
+                      <div className="text-[#5C4938] font-medium">
+                        服務項目：{srv ? `${srv.name} ($${srv.price})` : '美髮服務'}
+                      </div>
+                      <div className="text-[#7D7168]">預約貴賓：{apt.customerName} ({apt.phone})</div>
+                      {apt.remark && <div className="text-[#7D7168]">備註：{apt.remark}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== VIEW 2: 設計師後台管理介面 (Admin Dashboard) ==================== */}
+        {currentView === 'admin' && (
+          <div className="space-y-5">
+            {/* 後台子分頁切換 (Tab 1 / Tab 2 / Tab 3) */}
+            <div className="grid grid-cols-3 bg-[#EAE3DA] p-1 rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setAdminTab('appointments')}
+                className={`py-2 rounded-lg transition-all ${
+                  adminTab === 'appointments' ? 'bg-[#3A2E26] text-white shadow-sm' : 'text-[#5C4938]'
+                }`}
               >
-                <input
-                  type="password"
-                  value={adminPinInput}
-                  onChange={(e) => setAdminPinInput(e.target.value)}
-                  placeholder="請輸入管理員密碼 (8888)"
-                  className="w-full px-4 py-2.5 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-sm"
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    className="flex-1 py-3 rounded-xl bg-[#2C2520] text-white text-xs font-medium tracking-wider hover:bg-[#3E342D]"
-                  >
-                    驗證並進入後台
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAdminAuthenticated(true);
-                      showToast('快速體驗登入', '已進入設計師管理後台', 'info');
-                    }}
-                    className="px-4 py-3 rounded-xl bg-[#EFECE6] text-[#5C4E41] text-xs font-medium hover:bg-[#E5DEC9]"
-                  >
-                    一鍵快速登入
-                  </button>
-                </div>
-              </form>
+                1. 訂單管理
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminTab('schedule')}
+                className={`py-2 rounded-lg transition-all ${
+                  adminTab === 'schedule' ? 'bg-[#3A2E26] text-white shadow-sm' : 'text-[#5C4938]'
+                }`}
+              >
+                2. 時段與店休
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminTab('services')}
+                className={`py-2 rounded-lg transition-all ${
+                  adminTab === 'services' ? 'bg-[#3A2E26] text-white shadow-sm' : 'text-[#5C4938]'
+                }`}
+              >
+                3. 服務設定
+              </button>
             </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="bg-white border border-[#E5DEC9] rounded-3xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-[#2C2520]">髮嶼 Hair Island · 設計師管理後台</h2>
-                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#E6EFE6] text-[#3B6E4C] font-medium">
-                      Admin 權限已啟用
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#8A7968] mt-1">
-                    即時連動 Firestore 資料庫與 LINE Messaging API 推播通知
-                  </p>
+
+            {/* ---------- Tab 1: 訂單管理 (Appointments) ---------- */}
+            {adminTab === 'appointments' && (
+              <div className="bg-white rounded-2xl p-5 border border-[#E6DFD5] shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-bold text-[#2C2520]">預約訂單管理（依日期排序）</h2>
+                  <span className="text-xs text-[#8C6D53]">共 {sortedAppointments.length} 筆</span>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => setAdminTab('appointments')}
-                    className={`px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
-                      adminTab === 'appointments'
-                        ? 'bg-[#6E5039] text-white'
-                        : 'bg-[#FAF8F5] text-[#5C4E41] hover:bg-[#EFECE6]'
-                    }`}
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    Tab 1: 訂單管理 ({appointments.length})
-                  </button>
-                  <button
-                    onClick={() => setAdminTab('schedule')}
-                    className={`px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
-                      adminTab === 'schedule'
-                        ? 'bg-[#6E5039] text-white'
-                        : 'bg-[#FAF8F5] text-[#5C4E41] hover:bg-[#EFECE6]'
-                    }`}
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    Tab 2: 行事曆與時段管理
-                  </button>
-                  <button
-                    onClick={() => setAdminTab('services')}
-                    className={`px-4 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
-                      adminTab === 'services'
-                        ? 'bg-[#6E5039] text-white'
-                        : 'bg-[#FAF8F5] text-[#5C4E41] hover:bg-[#EFECE6]'
-                    }`}
-                  >
-                    <Scissors className="w-3.5 h-3.5" />
-                    Tab 3: 服務與價格設定
-                  </button>
-                  <button
-                    onClick={() => setIsAdminAuthenticated(false)}
-                    className="p-2 rounded-xl text-[#8A7968] hover:text-red-600 hover:bg-red-50"
-                    title="登出後台"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {adminTab === 'appointments' && (
-                <div className="space-y-4">
-                  {[...appointments]
-                    .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
-                    .map((appt) => {
-                      const srv = services.find((s) => s.id === appt.serviceId) || {
-                        name: '已下架服務',
-                        price: 0,
-                        duration: 60
-                      };
-
-                      const statusBadge = {
-                        pending: { label: '待確認 (Pending)', cls: 'bg-amber-100 text-amber-800 border-amber-300' },
-                        confirmed: { label: '已確認 (Confirmed)', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-                        completed: { label: '已完成 (Completed)', cls: 'bg-stone-200 text-stone-700 border-stone-300' },
-                        cancelled: { label: '已取消 (Cancelled)', cls: 'bg-rose-100 text-rose-700 border-rose-200' }
-                      }[appt.status];
-
+                {sortedAppointments.length === 0 ? (
+                  <div className="text-center py-10 text-xs text-[#8C7A6B]">目前尚無預約訂單</div>
+                ) : (
+                  <div className="space-y-3">
+                    {sortedAppointments.map((apt) => {
+                      const srv = services.find((s) => s.id === apt.serviceId);
                       return (
                         <div
-                          key={appt.id}
-                          className="bg-white border border-[#E5DEC9] rounded-3xl p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                          key={apt.id}
+                          className="p-4 rounded-xl border border-[#E6DFD5] bg-[#FAF8F5] space-y-2 text-xs"
                         >
-                          <div className="space-y-1.5">
-                            <div className="flex flex-wrap items-center gap-2.5">
-                              <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-medium ${statusBadge.cls}`}>
-                                {statusBadge.label}
-                              </span>
-                              <span className="text-sm font-semibold text-[#2C2520]">
-                                {appt.date} · {appt.time} - {appt.endTime}
-                              </span>
-                              <span className="text-xs text-[#8A7968] font-mono">#{appt.id}</span>
-                            </div>
-
-                            <div className="text-sm font-medium text-[#4A3C31]">
-                              貴賓：{appt.customerName}（{appt.phone}）
-                              <span className="text-xs text-[#8A7968] ml-2">LINE UID: {appt.liffUserId.slice(0, 10)}...</span>
-                            </div>
-
-                            <div className="text-xs text-[#6E5039] font-medium">
-                              預約項目：{srv.name}（{srv.duration} 分鐘 / NT$ {srv.price.toLocaleString()}）
-                            </div>
-
-                            {appt.remark && (
-                              <div className="text-xs text-[#7A6855] bg-[#FAF8F5] px-3 py-1.5 rounded-xl border border-[#ECE6DA] inline-block">
-                                備註：{appt.remark}
-                              </div>
-                            )}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold text-[#2C2520]">
+                              📅 {apt.date}｜{apt.time} - {apt.endTime}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded font-semibold ${
+                                apt.status === 'pending'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : apt.status === 'confirmed'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : apt.status === 'completed'
+                                  ? 'bg-stone-200 text-stone-700'
+                                  : 'bg-rose-100 text-rose-700'
+                              }`}
+                            >
+                              {apt.status.toUpperCase()}
+                            </span>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-2 shrink-0">
-                            {appt.status === 'pending' && (
+                          <div className="text-[#3A2E26] font-semibold">
+                            👤 {apt.customerName}（{apt.phone}）
+                          </div>
+                          <div className="text-[#5C4938]">
+                            💇 服務：{srv ? `${srv.name} ($${srv.price} / ${srv.duration}分)` : apt.serviceId}
+                          </div>
+                          {apt.remark && <div className="text-[#7D7168]">💬 備註：{apt.remark}</div>}
+
+                          {/* 操作按鈕列 */}
+                          <div className="pt-2 flex flex-wrap gap-2 border-t border-[#EAE3DA]">
+                            {apt.status === 'pending' && (
                               <button
-                                onClick={() => handleConfirmAppointment(appt)}
-                                className="px-4 py-2 rounded-xl bg-[#06C755] hover:bg-[#05b04b] text-white text-xs font-medium flex items-center gap-1.5 shadow-xs"
+                                type="button"
+                                onClick={() => handleConfirmAppointment(apt)}
+                                className="flex-1 py-2 px-3 rounded-lg bg-[#3A2E26] text-white font-semibold hover:bg-[#2C2520]"
                               >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                確認預約 (鎖定時段＋發送 LINE)
+                                ✓ 確認預約 (鎖定日曆+推播)
                               </button>
                             )}
 
-                            <button
-                              onClick={() => sendReminderMsg(appt, srv)}
-                              className="px-3.5 py-2 rounded-xl bg-[#F3EFE6] hover:bg-[#E5DEC9] text-[#5C4E41] text-xs font-medium flex items-center gap-1.5 border border-[#D8CBB8]"
-                            >
-                              <BellRing className="w-3.5 h-3.5 text-[#6E5039]" />
-                              一鍵發送明日提醒
-                            </button>
-
-                            {appt.status === 'confirmed' && (
+                            {apt.status === 'confirmed' && (
                               <button
-                                onClick={() => handleUpdateApptStatus(appt.id, 'completed')}
-                                className="px-3 py-2 rounded-xl border border-[#DCD3C6] text-xs text-[#5C4E41] hover:bg-[#FAF8F5]"
+                                type="button"
+                                onClick={() => handleChangeAppointmentStatus(apt, 'completed')}
+                                className="py-2 px-3 rounded-lg bg-stone-600 text-white font-semibold"
                               >
                                 標記完成
                               </button>
                             )}
 
-                            {appt.status !== 'cancelled' && (
+                            {/* 一鍵發送明日提醒按鈕 */}
+                            <button
+                              type="button"
+                              onClick={() => sendReminderMsg(apt, srv)}
+                              className="py-2 px-3 rounded-lg bg-[#8C6D53] text-white font-semibold"
+                            >
+                              🔔 一鍵發送提醒
+                            </button>
+
+                            {apt.status !== 'cancelled' && (
                               <button
-                                onClick={() => handleUpdateApptStatus(appt.id, 'cancelled')}
-                                className="px-3 py-2 rounded-xl text-xs text-rose-600 hover:bg-rose-50"
+                                type="button"
+                                onClick={() => handleChangeAppointmentStatus(apt, 'cancelled')}
+                                className="py-2 px-3 rounded-lg bg-rose-100 text-rose-700 font-semibold"
                               >
-                                取消訂單
+                                取消
                               </button>
                             )}
                           </div>
                         </div>
                       );
                     })}
-                </div>
-              )}
-
-              {adminTab === 'schedule' && (
-                <div className="bg-white border border-[#E5DEC9] rounded-3xl p-6 shadow-sm space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#ECE6DA]">
-                    <div>
-                      <h3 className="text-base font-semibold text-[#2C2520]">視覺化時段鎖定與店休設定</h3>
-                      <p className="text-xs text-[#8A7968]">
-                        點擊下方任一 30 分鐘區間即可手動切換「開放預約」或「店休/不開放」
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        value={scheduleDate}
-                        onChange={(e) => setScheduleDate(e.target.value)}
-                        className="px-3.5 py-2 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-xs font-medium"
-                      />
-                      <button
-                        onClick={() => toggleWholeDayOff(scheduleDate, true)}
-                        className="px-3 py-2 rounded-xl bg-[#2C2520] text-white text-xs hover:bg-[#3E342D]"
-                      >
-                        設為整日店休
-                      </button>
-                      <button
-                        onClick={() => toggleWholeDayOff(scheduleDate, false)}
-                        className="px-3 py-2 rounded-xl border border-[#DCD3C6] text-xs text-[#5C4E41] hover:bg-[#FAF8F5]"
-                      >
-                        全時段開放
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-3">
-                    {ALL_DAILY_SLOTS.map((slot) => {
-                      const availDoc = availability.find((a) => a.date === scheduleDate);
-                      const isBlocked = availDoc ? availDoc.blockedSlots.includes(slot) : false;
-
-                      const occupyingAppt = appointments.find((apt) => {
-                        if (apt.date !== scheduleDate || apt.status !== 'confirmed') return false;
-                        const srv = services.find((s) => s.id === apt.serviceId);
-                        const slots = expandRequiredSlots(apt.time, srv ? srv.duration : 60);
-                        return slots.includes(slot);
-                      });
-
-                      const nextSlot = minsToTime(timeToMins(slot) + 30);
-
-                      return (
-                        <button
-                          key={slot}
-                          onClick={() => toggleManualBlockSlot(scheduleDate, slot)}
-                          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                            occupyingAppt
-                              ? 'bg-[#EFECE6] border-[#6E5039] text-[#2C2520]'
-                              : isBlocked
-                              ? 'bg-stone-800 border-stone-800 text-stone-100'
-                              : 'bg-[#FAF8F5] border-[#DCD3C6] text-[#2C2520] hover:border-[#6E5039]'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between w-full mb-2">
-                            <span className="text-xs font-semibold">
-                              {slot} - {nextSlot}
-                            </span>
-                            {isBlocked || occupyingAppt ? (
-                              <Lock className="w-3.5 h-3.5 opacity-80" />
-                            ) : (
-                              <Unlock className="w-3.5 h-3.5 text-[#3B6E4C]" />
-                            )}
-                          </div>
-
-                          {occupyingAppt ? (
-                            <div className="text-[11px] text-[#6E5039] font-medium truncate">
-                              客約：{occupyingAppt.customerName}
-                            </div>
-                          ) : isBlocked ? (
-                            <div className="text-[11px] text-amber-300">店休 / 已手動鎖定</div>
-                          ) : (
-                            <div className="text-[11px] text-[#3B6E4C]">開放預約中</div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {adminTab === 'services' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <form
-                    onSubmit={handleSaveService}
-                    className="bg-white border border-[#E5DEC9] rounded-3xl p-6 shadow-sm space-y-4 h-fit"
-                  >
-                    <h3 className="text-base font-semibold text-[#2C2520] flex items-center gap-2">
-                      {editingService ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                      {editingService ? '編輯服務項目' : '新增服務項目'}
-                    </h3>
-
-                    <div>
-                      <label className="block text-xs text-[#5C4E41] mb-1">品項名稱 *</label>
-                      <input
-                        type="text"
-                        value={newServiceForm.name}
-                        onChange={(e) => setNewServiceForm({ ...newServiceForm, name: e.target.value })}
-                        placeholder="例如：深層木質調精油SPA"
-                        className="w-full px-3.5 py-2 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-xs"
-                        required
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-[#5C4E41] mb-1">價格 (NT$) *</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="50"
-                          value={newServiceForm.price}
-                          onChange={(e) => setNewServiceForm({ ...newServiceForm, price: e.target.value })}
-                          placeholder="1500"
-                          className="w-full px-3.5 py-2 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-xs"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-[#5C4E41] mb-1">所需時間 (半小時單位)</label>
-                        <select
-                          value={newServiceForm.duration}
-                          onChange={(e) => setNewServiceForm({ ...newServiceForm, duration: Number(e.target.value) })}
-                          className="w-full px-3 py-2 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-xs"
-                        >
-                          {[30, 60, 90, 120, 150, 180, 210, 240].map((mins) => (
-                            <option key={mins} value={mins}>
-                              {mins} 分鐘 ({mins / 60} 小時)
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-[#5C4E41] mb-1">服務說明</label>
-                      <textarea
-                        rows={2}
-                        value={newServiceForm.desc}
-                        onChange={(e) => setNewServiceForm({ ...newServiceForm, desc: e.target.value })}
-                        placeholder="簡述服務特色與包含流程..."
-                        className="w-full px-3.5 py-2 bg-[#FAF8F5] border border-[#DCD3C6] rounded-xl text-xs"
-                      />
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        className="flex-1 py-2.5 rounded-xl bg-[#6E5039] text-white text-xs font-medium hover:bg-[#593F2C]"
-                      >
-                        {editingService ? '儲存修改' : '新增至資料庫'}
-                      </button>
-                      {editingService && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingService(null);
-                            setNewServiceForm({ name: '', price: '', duration: 60, desc: '' });
-                          }}
-                          className="px-3 py-2.5 rounded-xl border border-[#DCD3C6] text-xs text-[#5C4E41]"
-                        >
-                          取消
-                        </button>
-                      )}
-                    </div>
-                  </form>
-
-                  <div className="lg:col-span-2 space-y-3">
-                    {services.map((srv) => (
-                      <div
-                        key={srv.id}
-                        className="bg-white border border-[#E5DEC9] rounded-2xl p-4 flex items-center justify-between gap-4"
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm text-[#2C2520]">{srv.name}</span>
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#EFECE6] text-[#6E5039]">
-                              {srv.duration} 分鐘
-                            </span>
-                          </div>
-                          <p className="text-xs text-[#8A7968] mt-1">{srv.desc}</p>
-                        </div>
-
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-sm font-semibold text-[#6E5039]">
-                            NT$ {srv.price.toLocaleString()}
-                          </span>
-                          <button
-                            onClick={() => {
-                              setEditingService(srv);
-                              setNewServiceForm({
-                                name: srv.name,
-                                price: srv.price,
-                                duration: srv.duration,
-                                desc: srv.desc || ''
-                              });
-                            }}
-                            className="p-2 rounded-xl hover:bg-[#EFECE6] text-[#5C4E41]"
-                            title="編輯"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteService(srv.id)}
-                            className="p-2 rounded-xl hover:bg-rose-50 text-rose-600"
-                            title="刪除"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="bg-[#2C2520] text-[#EBE5DC] rounded-3xl p-6 shadow-md">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#06C755]" />
-                    <h4 className="text-xs font-semibold tracking-wider uppercase">
-                      LINE LIFF & Messaging API Webhook 即時發訊紀錄
-                    </h4>
-                  </div>
-                  <span className="text-[11px] text-[#9A8C7E]">共 {lineLogs.length} 筆推播紀錄</span>
-                </div>
-
-                {lineLogs.length === 0 ? (
-                  <p className="text-xs text-[#9A8C7E] py-3">
-                    尚無發訊紀錄。請嘗試於客戶端送出預約、於後台點擊「確認預約」或「一鍵發送明日提醒」測試觸發。
-                  </p>
-                ) : (
-                  <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-                    {lineLogs.map((log) => (
-                      <div
-                        key={log.id}
-                        className="bg-[#3A312A] border border-[#52443A] rounded-2xl p-3.5 text-xs space-y-1"
-                      >
-                        <div className="flex items-center justify-between text-[#C8B9A6]">
-                          <span className="font-semibold text-[#06C755]">{log.type}</span>
-                          <span>
-                            對象：{log.to} · {log.time}
-                          </span>
-                        </div>
-                        <pre className="text-[#EBE5DC] whitespace-pre-wrap font-sans leading-relaxed">
-                          {log.content}
-                        </pre>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+
+            {/* ---------- Tab 2: 行事曆與時段管理 (Schedule) ---------- */}
+            {adminTab === 'schedule' && (
+              <div className="bg-white rounded-2xl p-5 border border-[#E6DFD5] shadow-sm space-y-4">
+                <div>
+                  <h2 className="text-base font-bold text-[#2C2520]">行事曆與時段鎖定管理</h2>
+                  <p className="text-xs text-[#7D7168] mt-1">
+                    點選特定日期與時段，即可手動將其標記為「店休/不開放 (blockedSlots)」。
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    className="flex-1 h-10 px-3 rounded-xl border border-[#D8CFC4] text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleToggleFullDayClosed(scheduleDate)}
+                    className="h-10 px-3.5 rounded-xl bg-[#F5EBEB] text-[#A66A6A] text-xs font-bold"
+                  >
+                    切換整日店休
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 pt-2">
+                  {DAILY_TIME_SLOTS.map((slot) => {
+                    const isBlocked = (availability[scheduleDate] || []).includes(slot);
+                    return (
+                      <button
+                        type="button"
+                        key={slot}
+                        onClick={() => handleToggleBlockedSlot(scheduleDate, slot)}
+                        className={`py-2.5 rounded-xl text-xs font-semibold border transition-all ${
+                          isBlocked
+                            ? 'bg-[#F5EBEB] text-[#A66A6A] border-[#E8CACA]'
+                            : 'bg-[#EEF5F0] text-[#3B6E4C] border-[#CBE0D2]'
+                        }`}
+                      >
+                        <div>{slot}</div>
+                        <div className="text-[10px] mt-0.5">{isBlocked ? '不開放' : '開放中'}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ---------- Tab 3: 服務與價格設定 (Services Setup CRUD) ---------- */}
+            {adminTab === 'services' && (
+              <div className="bg-white rounded-2xl p-5 border border-[#E6DFD5] shadow-sm space-y-5">
+                <h2 className="text-base font-bold text-[#2C2520]">服務品項、價格與時長設定</h2>
+
+                {/* 新增 / 編輯服務表單 */}
+                <form
+                  onSubmit={handleSaveService}
+                  className="bg-[#FAF8F5] p-4 rounded-xl border border-[#E6DFD5] space-y-3"
+                >
+                  <div className="text-xs font-bold text-[#5C4938]">
+                    {editingService.id ? '✏️ 編輯服務項目' : '＋ 新增服務項目'}
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="品項名稱（如：深層結構護髮）"
+                    value={editingService.name}
+                    onChange={(e) => setEditingService({ ...editingService, name: e.target.value })}
+                    className="w-full h-10 px-3 rounded-lg border border-[#D8CFC4] text-xs bg-white"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      required
+                      placeholder="價格 (NT$)"
+                      value={editingService.price}
+                      onChange={(e) => setEditingService({ ...editingService, price: e.target.value })}
+                      className="h-10 px-3 rounded-lg border border-[#D8CFC4] text-xs bg-white"
+                    />
+                    <select
+                      value={editingService.duration}
+                      onChange={(e) =>
+                        setEditingService({ ...editingService, duration: Number(e.target.value) })
+                      }
+                      className="h-10 px-3 rounded-lg border border-[#D8CFC4] text-xs bg-white"
+                    >
+                      {[30, 60, 90, 120, 150, 180, 210, 240].map((min) => (
+                        <option key={min} value={min}>
+                          所需時間：{min} 分鐘
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      className="flex-1 h-9 rounded-lg bg-[#3A2E26] text-white text-xs font-semibold"
+                    >
+                      {editingService.id ? '儲存更新' : '確認新增'}
+                    </button>
+                    {editingService.id && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingService({ id: '', name: '', price: '', duration: 60 })}
+                        className="px-4 h-9 rounded-lg bg-stone-200 text-stone-700 text-xs font-semibold"
+                      >
+                        取消
+                      </button>
+                    )}
+                  </div>
+                </form>
+
+                {/* 現有服務列表 */}
+                <div className="space-y-2">
+                  {services.map((srv) => (
+                    <div
+                      key={srv.id}
+                      className="p-3.5 rounded-xl border border-[#E6DFD5] flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <div className="font-bold text-[#2C2520] text-sm">{srv.name}</div>
+                        <div className="text-[#7D7168]">
+                          價格：NT$ {srv.price}｜時長：{srv.duration} 分鐘
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditingService(srv)}
+                          className="px-2.5 py-1.5 rounded-lg bg-[#F2ECE4] text-[#5C4938] font-semibold"
+                        >
+                          編輯
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteService(srv.id)}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 font-semibold"
+                        >
+                          刪除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
