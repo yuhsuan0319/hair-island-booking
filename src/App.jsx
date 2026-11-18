@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 // ==================== 系統環境常數 ====================
 const LIFF_ID = '2012650134-fNn1I0l8';
 const ADMIN_USER_ID = 'U5e88b1121f054ba725948e898394016e';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzz6sxxZ-pArV_MJ2yypT6gUuMaZQEmXXM597ayfQcJIlWuYvAYISavd4MGR4cytpw0/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxtCSm5hC7il0X5oHy9xPcr14ugeMHw2CTdjSqlmsBpllm-qIaTjQb5Rh-bz1aSkHZ1/exec';
 
 // 營業時段：11:00 至 19:00
 const DAILY_TIME_SLOTS = [
