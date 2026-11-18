@@ -1206,31 +1206,3 @@ export default function App() {
       </div>
     </div>
   );
-}
-// 測試模擬寫入一筆預約訂單
-function testAddMockBooking() {
-  var props = PropertiesService.getScriptProperties();
-  var currentList = JSON.parse(props.getProperty("HI_APPOINTMENTS") || "[]");
-  
-  var mockApt = {
-    id: "apt_test_" + new Date().getTime(),
-    createdAt: new Date().toLocaleString("zh-TW"),
-    liffUserId: "U_TEST_USER",
-    customerName: "測試貴賓",
-    phone: "0912345678",
-    serviceId: "srv_1",
-    serviceName: "質感剪髮 ($600)",
-    date: "2026-11-20",
-    time: "14:00",
-    endTime: "15:00",
-    status: "pending",
-    remark: "系統連線測試"
-  };
-  
-  currentList.push(mockApt);
-  props.setProperty("HI_APPOINTMENTS", JSON.stringify(currentList));
-  
-  var srvList = JSON.parse(props.getProperty("HI_SERVICES") || "[]");
-  syncAppointmentsToSheet(currentList, srvList);
-  Logger.log("✅ 已成功寫入一筆模擬訂單至試算表与雲端屬性！");
-}
