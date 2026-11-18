@@ -510,6 +510,15 @@ export default function App() {
   };
 
   const handleChangeAppointmentStatus = async (apt, newStatus) => {
+    if (apt.status === newStatus) return;
+
+    if (newStatus === 'cancelled') {
+      const isConfirmed = window.confirm(
+        `確定要取消「${apt.customerName}」於 ${apt.date} (${apt.time}) 的預約嗎？\n\n確認後將同步釋出時段、刪除 Google 日曆行程，並發送 LINE 取消通知給客人。`
+      );
+      if (!isConfirmed) return;
+    }
+
     const srv = services.find((s) => s.id === apt.serviceId);
 
     const nextAppointments = appointments.map((item) =>
