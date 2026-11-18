@@ -539,8 +539,6 @@ export default function App() {
 
     if (targetApt) {
       nextAvailability = releaseSlotsForAppointment(targetApt, nextAppointments, availability);
-      const srv = services.find((s) => s.id === targetApt.serviceId);
-      sendBookingCancelledMsg(targetApt, srv);
     }
 
     setAppointments(nextAppointments);
