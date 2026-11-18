@@ -10,7 +10,7 @@ const FIREBASE_API_KEY = 'AIzaSyC2snKdfx82eFdOUxobdSrlqZHm1LpLU9k';
 const FIRESTORE_DOC_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/hairisland/store_data?key=${FIREBASE_API_KEY}`;
 
 // 選填：保留原本的 GAS 網址僅作為發送 LINE Push 機器人訊息的輔助通道
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxjdoacFtBC5UuuK6KkS6td-VqAeb7bMBc8sYIkZxGKCuq0zZmeJV4oJdxiBn8hIctl/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwWZ8-2wsQKYF7ujbs1Kga2zMVzz4vLLCcyat0MYmLETc5LJKVIbhulF-6wBpLFjyvU/exec';
 
 // 營業時段：11:00 至 19:00
 const DAILY_TIME_SLOTS = [
