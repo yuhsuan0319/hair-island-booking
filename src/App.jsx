@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
-// ==================== 系統環境常數 ====================
+// ==================== 系統與 Firebase 專屬常數 ====================
 const LIFF_ID = '2012650134-fNn1I0l8';
 const ADMIN_USER_ID = 'U5e88b1121f054ba725948e898394016e';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxtCSm5hC7il0X5oHy9xPcr14ugeMHw2CTdjSqlmsBpllm-qIaTjQb5Rh-bz1aSkHZ1/exec';
+
+// 綁定你的 Firebase 專案 (hairisland-e6a6f) - 免安裝 npm 套件直連雲端
+const FIREBASE_PROJECT_ID = 'hairisland-e6a6f';
+const FIREBASE_API_KEY = 'AIzaSyC2snKdfx82eFdOUxobdSrlqZHm1LpLU9k';
+const FIRESTORE_DOC_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/hairisland/store_data?key=${FIREBASE_API_KEY}`;
+
+// 選填：保留原本的 GAS 網址僅作為發送 LINE Push 機器人訊息的輔助通道
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzz6sxxZ-pArV_MJ2yypT6gUuMaZQEmXXM597ayfQcJIlWuYvAYISavd4MGR4cytpw0/exec';
 
 // 營業時段：11:00 至 19:00
 const DAILY_TIME_SLOTS = [
@@ -55,7 +62,9 @@ export default function App() {
   const [appointments, setAppointments] = useState([]);
   const [availability, setAvailability] = useState({});
   const [isSyncing, setIsSyncing] = useState(false);
+  const [dbError, setDbError] = useState('');
 
+  // 客戶端表單狀態
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
@@ -77,54 +86,85 @@ export default function App() {
   });
   const [editingService, setEditingService] = useState({ id: '', name: '', price: '', duration: 60 });
 
-  // 統一套用從雲端抓回來的最新資料
-  const applyCloudData = useCallback((data) => {
-    if (data?.services?.length) {
-      setServices(data.services);
-      localStorage.setItem('hi_services', JSON.stringify(data.services));
-    }
-    if (Array.isArray(data?.appointments)) {
-      setAppointments(data.appointments);
-      localStorage.setItem('hi_appointments', JSON.stringify(data.appointments));
-    }
-    if (data?.availability) {
-      setAvailability(data.availability);
-      localStorage.setItem('hi_availability', JSON.stringify(data.availability));
-    }
-  }, []);
-
-  // 從 GAS 拉取最新資料庫（加上時間戳記防止手機瀏覽器快取）
-  const fetchCloudDB = useCallback(async () => {
+  // ==================== Firebase Firestore 直連讀寫核心 ====================
+  // 1. 從 Firebase 讀取最新雲端資料
+  const fetchFromFirebase = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const res = await fetch(`${GAS_URL}?action=getDatabase&t=${Date.now()}`);
-      const data = await res.json();
-      applyCloudData(data);
-    } catch (e) {
-      console.error('讀取雲端資料庫失敗:', e);
+      const res = await fetch(`${FIRESTORE_DOC_URL}&t=${Date.now()}`);
+      if (res.status === 404) {
+        // 首次使用尚未建立文件，自動初始化
+        setDbError('');
+        setIsSyncing(false);
+        return null;
+      }
+      if (!res.ok) {
+        setDbError('請確認已在 Firebase 後台開啟「Firestore Database」並設為「測試模式 (Test mode)」');
+        setIsSyncing(false);
+        return null;
+      }
+      const doc = await res.json();
+      setDbError('');
+      if (doc && doc.fields) {
+        const parsedServices = doc.fields.services?.stringValue
+          ? JSON.parse(doc.fields.services.stringValue)
+          : DEFAULT_SERVICES;
+        const parsedAppointments = doc.fields.appointments?.stringValue
+          ? JSON.parse(doc.fields.appointments.stringValue)
+          : [];
+        const parsedAvailability = doc.fields.availability?.stringValue
+          ? JSON.parse(doc.fields.availability.stringValue)
+          : {};
+
+        setServices(parsedServices);
+        setAppointments(parsedAppointments);
+        setAvailability(parsedAvailability);
+        return {
+          services: parsedServices,
+          appointments: parsedAppointments,
+          availability: parsedAvailability
+        };
+      }
+    } catch (err) {
+      console.error('Firebase 讀取錯誤:', err);
     } finally {
       setIsSyncing(false);
     }
-  }, [applyCloudData]);
+    return null;
+  }, []);
 
-  // 通用 POST 請求函式（使用 text/plain 避開 CORS 預檢並直接解析回傳的最新資料庫）
-  const postToGas = async (payload) => {
+  // 2. 將資料寫入 Firebase Firestore
+  const saveToFirebase = async (nextServices, nextAppointments, nextAvailability) => {
+    setIsSyncing(true);
     try {
-      const res = await fetch(GAS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
+      const body = {
+        fields: {
+          services: { stringValue: JSON.stringify(nextServices) },
+          appointments: { stringValue: JSON.stringify(nextAppointments) },
+          availability: { stringValue: JSON.stringify(nextAvailability) },
+          updatedAt: { stringValue: new Date().toISOString() }
+        }
+      };
+
+      const res = await fetch(FIRESTORE_DOC_URL, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
       });
-      const data = await res.json();
-      applyCloudData(data);
-      return data;
+
+      if (!res.ok) {
+        setDbError('寫入失敗：請確認 Firebase Firestore 已啟用並設為測試模式');
+      } else {
+        setDbError('');
+      }
     } catch (err) {
-      console.error('GAS 同步失敗:', err);
-      return null;
+      console.error('Firebase 寫入失敗:', err);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
-  // 1. 初始化 LIFF
+  // ==================== LINE 整合 API 邏輯函式 ====================
   const initLiff = async () => {
     try {
       if (!window.liff) {
@@ -152,7 +192,7 @@ export default function App() {
     }
   };
 
-  // 2. 客戶端送出預約後，發送「預約待確認」並由後端原子化寫入
+  // 客戶端送出預約後發送 LINE 通知
   const sendBookingPendingMsg = async (appointment, serviceObj) => {
     if (window.liff && window.liff.isInClient()) {
       try {
@@ -163,54 +203,58 @@ export default function App() {
           }
         ]);
       } catch (e) {
-        console.warn('LIFF 聊天室傳訊略過:', e);
+        console.warn('LIFF 傳訊略過:', e);
       }
     }
 
-    await postToGas({
-      action: 'createBooking',
-      appointment,
-      serviceName: serviceObj.name,
-      servicePrice: serviceObj.price,
-      duration: serviceObj.duration
-    });
+    // 同步觸發 GAS 推播（非必要，僅作雙重通知）
+    try {
+      fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify({
+          action: 'sendBookingPendingMsg',
+          appointment,
+          serviceName: serviceObj.name,
+          servicePrice: serviceObj.price,
+          duration: serviceObj.duration
+        })
+      });
+    } catch (e) {}
   };
 
-  // 3. 後台設計師點擊確認後，發送「預約已確認」
-  const sendBookingConfirmedMsg = async (appointment, serviceObj, updatedAppointments, updatedAvailability) => {
-    await postToGas({
-      action: 'sendBookingConfirmedMsg',
-      appointment,
-      serviceName: serviceObj ? serviceObj.name : '專屬美髮服務',
-      appointments: updatedAppointments,
-      availability: updatedAvailability
-    });
+  const sendBookingConfirmedMsg = async (appointment, serviceObj) => {
+    try {
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify({
+          action: 'sendBookingConfirmedMsg',
+          appointment,
+          serviceName: serviceObj ? serviceObj.name : '專屬美髮服務'
+        })
+      });
+    } catch (e) {}
   };
 
-  // 4. 後台觸發前一日提醒
   const sendReminderMsg = async (appointment, serviceObj) => {
-    await postToGas({
-      action: 'sendReminderMsg',
-      appointment,
-      serviceName: serviceObj ? serviceObj.name : '專屬美髮服務'
-    });
-    alert(`✅ 已透過 LINE 向「${appointment.customerName}」發送明日預約提醒！`);
+    try {
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify({
+          action: 'sendReminderMsg',
+          appointment,
+          serviceName: serviceObj ? serviceObj.name : '專屬美髮服務'
+        })
+      });
+      alert(`✅ 已發送明日預約提醒通知！`);
+    } catch (e) {
+      alert('已觸發提醒！');
+    }
   };
 
-  // 後台管理設定同步
-  const syncDatabase = async (nextServices, nextAppointments, nextAvailability) => {
-    localStorage.setItem('hi_services', JSON.stringify(nextServices));
-    localStorage.setItem('hi_appointments', JSON.stringify(nextAppointments));
-    localStorage.setItem('hi_availability', JSON.stringify(nextAvailability));
-
-    await postToGas({
-      action: 'syncDatabase',
-      services: nextServices,
-      appointments: nextAppointments,
-      availability: nextAvailability
-    });
-  };
-
+  // 初始化載入 Tailwind、LIFF 與 Firebase 雲端資料（並每 6 秒自動輪詢保持即時更新）
   useEffect(() => {
     if (!document.getElementById('tailwind-cdn')) {
       const script = document.createElement('script');
@@ -220,32 +264,23 @@ export default function App() {
     }
 
     initLiff();
+    fetchFromFirebase();
 
-    const localSrv = localStorage.getItem('hi_services');
-    const localApt = localStorage.getItem('hi_appointments');
-    const localAvl = localStorage.getItem('hi_availability');
-    if (localSrv) setServices(JSON.parse(localSrv));
-    if (localApt) setAppointments(JSON.parse(localApt));
-    if (localAvl) setAvailability(JSON.parse(localAvl));
-
-    fetchCloudDB();
-  }, [fetchCloudDB]);
-
-  // 每次切換到「後台」或「我的訂單」時，自動向雲端拉取最新預約資料
-  useEffect(() => {
-    if (currentView === 'admin' || currentView === 'my_bookings') {
-      fetchCloudDB();
-    }
-  }, [currentView, fetchCloudDB]);
+    const timer = setInterval(() => {
+      fetchFromFirebase();
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [fetchFromFirebase]);
 
   const selectedService = useMemo(() => {
     return services.find((s) => s.id === selectedServiceId) || services[0];
   }, [services, selectedServiceId]);
 
-  const getUnavailableSlotsForDate = (dateStr, ignoreAppointmentId = null) => {
-    const blocked = new Set(availability[dateStr] || []);
+  // ==================== 時段與連續空檔檢核邏輯 ====================
+  const getUnavailableSlotsForDate = (dateStr, ignoreAppointmentId = null, customAptList = appointments, customAvl = availability) => {
+    const blocked = new Set(customAvl[dateStr] || []);
 
-    appointments.forEach((apt) => {
+    customAptList.forEach((apt) => {
       if (apt.id === ignoreAppointmentId) return;
       if (apt.date === dateStr && (apt.status === 'confirmed' || apt.status === 'pending')) {
         const srv = services.find((s) => s.id === apt.serviceId);
@@ -258,13 +293,13 @@ export default function App() {
     return blocked;
   };
 
-  const isSlotBookable = (dateStr, startTime, durationMinutes, ignoreAppointmentId = null) => {
+  const isSlotBookable = (dateStr, startTime, durationMinutes, ignoreAppointmentId = null, customAptList = appointments, customAvl = availability) => {
     const startMin = timeToMinutes(startTime);
     const endMin = startMin + durationMinutes;
     if (endMin > CLOSING_MINUTES) return false;
 
     const requiredSlots = getOccupiedSlots(startTime, durationMinutes);
-    const unavailableSet = getUnavailableSlotsForDate(dateStr, ignoreAppointmentId);
+    const unavailableSet = getUnavailableSlotsForDate(dateStr, ignoreAppointmentId, customAptList, customAvl);
 
     for (const slot of requiredSlots) {
       if (unavailableSet.has(slot)) return false;
@@ -313,6 +348,7 @@ export default function App() {
     return /^09\d{8}$/.test(clean);
   };
 
+  // ==================== 客戶送出預約（直連 Firebase 防撞單） ====================
   const handleCreateAppointment = async (e) => {
     e.preventDefault();
     if (!customerName.trim()) {
@@ -330,14 +366,30 @@ export default function App() {
       return;
     }
 
-    const stillAvailable = isSlotBookable(selectedDate, selectedTime, selectedService.duration);
+    setIsSubmitting(true);
+
+    // 送出前先從 Firebase 抓取最新狀態，避免覆蓋其他客人的訂單並執行 Double Booking 檢核
+    const latestCloud = await fetchFromFirebase();
+    const currentAptList = latestCloud ? latestCloud.appointments : appointments;
+    const currentAvl = latestCloud ? latestCloud.availability : availability;
+    const currentSrvList = latestCloud ? latestCloud.services : services;
+
+    const stillAvailable = isSlotBookable(
+      selectedDate,
+      selectedTime,
+      selectedService.duration,
+      null,
+      currentAptList,
+      currentAvl
+    );
+
     if (!stillAvailable) {
-      alert('抱歉！您選擇的時段剛剛已被預約或時長不足，請重新選擇時段。');
+      alert('抱歉！您選擇的時段剛剛已被其他貴賓預約，請重新選擇時段。');
       setSelectedTime('');
+      setIsSubmitting(false);
       return;
     }
 
-    setIsSubmitting(true);
     const endTime = minutesToTime(timeToMinutes(selectedTime) + selectedService.duration);
 
     const newAppointment = {
@@ -346,18 +398,20 @@ export default function App() {
       customerName: customerName.trim(),
       phone: phone.trim(),
       serviceId: selectedService.id,
+      serviceName: selectedService.name,
       date: selectedDate,
       time: selectedTime,
       endTime: endTime,
       status: 'pending',
-      remark: remark.trim()
+      remark: remark.trim(),
+      createdAt: new Date().toLocaleString('zh-TW')
     };
 
-    // 先樂觀更新本地畫面，再由 sendBookingPendingMsg 觸發後端 createBooking 安全附加至雲端
-    const nextAppointments = [...appointments, newAppointment];
+    const nextAppointments = [...currentAptList, newAppointment];
     setAppointments(nextAppointments);
-    localStorage.setItem('hi_appointments', JSON.stringify(nextAppointments));
 
+    // 直接寫入 Firebase 雲端資料庫
+    await saveToFirebase(currentSrvList, nextAppointments, currentAvl);
     await sendBookingPendingMsg(newAppointment, selectedService);
 
     setIsSubmitting(false);
@@ -367,6 +421,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // ==================== 後台管理操作邏輯 ====================
   const handleConfirmAppointment = async (apt) => {
     const srv = services.find((s) => s.id === apt.serviceId);
     const dur = srv ? srv.duration : 60;
@@ -386,8 +441,9 @@ export default function App() {
     setAppointments(nextAppointments);
     setAvailability(nextAvailability);
 
-    await sendBookingConfirmedMsg({ ...apt, status: 'confirmed' }, srv, nextAppointments, nextAvailability);
-    alert(`✅ 已確認「${apt.customerName}」的預約，已鎖定日曆並發送 LINE 確認通知！`);
+    await saveToFirebase(services, nextAppointments, nextAvailability);
+    await sendBookingConfirmedMsg({ ...apt, status: 'confirmed' }, srv);
+    alert(`✅ 已確認「${apt.customerName}」的預約，並於雲端日曆鎖定該時段！`);
   };
 
   const handleChangeAppointmentStatus = async (apt, newStatus) => {
@@ -407,7 +463,13 @@ export default function App() {
 
     setAppointments(nextAppointments);
     setAvailability(nextAvailability);
-    await syncDatabase(services, nextAppointments, nextAvailability);
+    await saveToFirebase(services, nextAppointments, nextAvailability);
+  };
+
+  const handleDeleteAppointment = async (id) => {
+    const nextAppointments = appointments.filter((item) => item.id !== id);
+    setAppointments(nextAppointments);
+    await saveToFirebase(services, nextAppointments, availability);
   };
 
   const handleToggleBlockedSlot = async (dateStr, slot) => {
@@ -422,7 +484,7 @@ export default function App() {
       [dateStr]: nextBlocked
     };
     setAvailability(nextAvailability);
-    await syncDatabase(services, appointments, nextAvailability);
+    await saveToFirebase(services, appointments, nextAvailability);
   };
 
   const handleToggleFullDayClosed = async (dateStr) => {
@@ -433,7 +495,7 @@ export default function App() {
       [dateStr]: isAllClosed ? [] : [...DAILY_TIME_SLOTS]
     };
     setAvailability(nextAvailability);
-    await syncDatabase(services, appointments, nextAvailability);
+    await saveToFirebase(services, appointments, nextAvailability);
   };
 
   const handleSaveService = async (e) => {
@@ -459,7 +521,7 @@ export default function App() {
 
     setServices(nextServices);
     setEditingService({ id: '', name: '', price: '', duration: 60 });
-    await syncDatabase(nextServices, appointments, availability);
+    await saveToFirebase(nextServices, appointments, availability);
   };
 
   const handleDeleteService = async (id) => {
@@ -470,7 +532,7 @@ export default function App() {
     const nextServices = services.filter((s) => s.id !== id);
     setServices(nextServices);
     if (selectedServiceId === id) setSelectedServiceId(nextServices[0].id);
-    await syncDatabase(nextServices, appointments, availability);
+    await saveToFirebase(nextServices, appointments, availability);
   };
 
   const handleSecretAdminTrigger = () => {
@@ -503,6 +565,13 @@ export default function App() {
     <div className="min-h-screen bg-[#F7F4EF] text-[#2C2520] font-sans pb-16 selection:bg-[#8C6D53] selection:text-white">
       <div className="max-w-md mx-auto px-5 pt-6">
         
+        {/* 若尚未在 Firebase 開啟 Firestore 測試模式，顯示溫馨提醒 */}
+        {dbError && isAdmin && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900">
+            ⚠️ {dbError}
+          </div>
+        )}
+
         {/* Header */}
         <header className="flex items-center justify-between mb-8">
           <div
@@ -552,7 +621,7 @@ export default function App() {
                     : 'text-[#5C4938]'
                 }`}
               >
-                後台
+                後台 ({sortedAppointments.length})
               </button>
             )}
           </div>
@@ -588,7 +657,7 @@ export default function App() {
                 </div>
                 <ul className="text-xs text-[#60564F] space-y-1.5 leading-relaxed">
                   <li>・全店採一對一專屬預約制，營業時間為 11:00 - 19:00。</li>
-                  <li>・預約送出後為「待確認」狀態，設計師確認後將透過 LINE 通知。</li>
+                  <li>・預約送出後為「待確認」狀態，設計師確認後將通知您。</li>
                   <li>・當日保留 10 分鐘，如需更改或取消請提前於官方 LINE 告知。</li>
                 </ul>
               </div>
@@ -870,7 +939,7 @@ export default function App() {
                     : 'bg-[#3A2E26] text-white hover:bg-[#2C2520] shadow-md'
                 }`}
               >
-                {isSubmitting ? '檢核時段並傳送預約中...' : '確認預約'}
+                {isSubmitting ? '雲端同步傳送中...' : '確認預約'}
               </button>
             </form>
           </div>
@@ -883,10 +952,10 @@ export default function App() {
               <h2 className="text-lg font-bold text-[#2C2520]">我的預約紀錄</h2>
               <button
                 type="button"
-                onClick={fetchCloudDB}
+                onClick={fetchFromFirebase}
                 className="text-xs px-3 py-1 rounded-full bg-[#F2ECE4] text-[#5C4938] font-semibold"
               >
-                {isSyncing ? '同步中...' : '🔄 重新整理'}
+                {isSyncing ? '同步中...' : '🔄 立即刷新'}
               </button>
             </div>
             {customerAppointments.length === 0 ? (
@@ -916,7 +985,7 @@ export default function App() {
                         </span>
                       </div>
                       <div className="text-[#5C4938] font-medium">
-                        服務項目：{srv ? `${srv.name} ($${srv.price})` : '美髮服務'}
+                        服務項目：{srv ? `${srv.name} ($${srv.price})` : apt.serviceName || '美髮服務'}
                       </div>
                       <div className="text-[#7D7168]">預約貴賓：{apt.customerName} ({apt.phone})</div>
                       {apt.remark && <div className="text-[#7D7168]">備註：{apt.remark}</div>}
@@ -928,7 +997,7 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 2: 設計師後台管理介面 */}
+        {/* VIEW 2: 設計師後台管理介面 (Firebase 即時同步) */}
         {currentView === 'admin' && (
           <div className="space-y-5">
             <div className="grid grid-cols-3 bg-[#EAE3DA] p-1 rounded-xl text-xs font-semibold">
@@ -939,7 +1008,7 @@ export default function App() {
                   adminTab === 'appointments' ? 'bg-[#3A2E26] text-white shadow-sm' : 'text-[#5C4938]'
                 }`}
               >
-                1. 訂單管理 ({sortedAppointments.length})
+                1. 訂單 ({sortedAppointments.length})
               </button>
               <button
                 type="button"
@@ -964,13 +1033,16 @@ export default function App() {
             {adminTab === 'appointments' && (
               <div className="bg-white rounded-2xl p-5 border border-[#E6DFD5] shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-[#2C2520]">預約訂單管理</h2>
+                  <div>
+                    <h2 className="text-base font-bold text-[#2C2520]">預約訂單管理 (Firebase 雲端)</h2>
+                    <p className="text-[11px] text-[#8C7A6B]">每 6 秒自動同步最新訂單</p>
+                  </div>
                   <button
                     type="button"
-                    onClick={fetchCloudDB}
-                    className="text-xs px-3 py-1 rounded-full bg-[#F2ECE4] text-[#5C4938] font-semibold hover:bg-[#E6DFD5]"
+                    onClick={fetchFromFirebase}
+                    className="text-xs px-3 py-1.5 rounded-full bg-[#F2ECE4] text-[#5C4938] font-semibold hover:bg-[#E6DFD5]"
                   >
-                    {isSyncing ? '同步中...' : '🔄 重新整理'}
+                    {isSyncing ? '同步中...' : '🔄 立即刷新'}
                   </button>
                 </div>
 
@@ -1005,7 +1077,7 @@ export default function App() {
                           </div>
 
                           <div className="text-[#3A2E26] font-semibold">
-                            👤 {apt.customerName}（{apt.phone}）
+                            👤 {apt.customerName}（<a href={`tel:${apt.phone}`} className="underline">{apt.phone}</a>）
                           </div>
                           <div className="text-[#5C4938]">
                             💇 服務：{srv ? `${srv.name} ($${srv.price} / ${srv.duration}分)` : apt.serviceName || apt.serviceId}
@@ -1019,7 +1091,7 @@ export default function App() {
                                 onClick={() => handleConfirmAppointment(apt)}
                                 className="flex-1 py-2 px-3 rounded-lg bg-[#3A2E26] text-white font-semibold hover:bg-[#2C2520]"
                               >
-                                ✓ 確認預約 (鎖定日曆+推播)
+                                ✓ 確認預約 (鎖定日曆)
                               </button>
                             )}
 
@@ -1038,16 +1110,24 @@ export default function App() {
                               onClick={() => sendReminderMsg(apt, srv)}
                               className="py-2 px-3 rounded-lg bg-[#8C6D53] text-white font-semibold"
                             >
-                              🔔 一鍵發送提醒
+                              🔔 提醒
                             </button>
 
-                            {apt.status !== 'cancelled' && (
+                            {apt.status !== 'cancelled' ? (
                               <button
                                 type="button"
                                 onClick={() => handleChangeAppointmentStatus(apt, 'cancelled')}
                                 className="py-2 px-3 rounded-lg bg-rose-100 text-rose-700 font-semibold"
                               >
                                 取消
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteAppointment(apt.id)}
+                                className="py-2 px-3 rounded-lg bg-gray-200 text-gray-600 font-semibold"
+                              >
+                                刪除紀錄
                               </button>
                             )}
                           </div>
@@ -1206,3 +1286,4 @@ export default function App() {
       </div>
     </div>
   );
+}
