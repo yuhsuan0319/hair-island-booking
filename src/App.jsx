@@ -9,7 +9,7 @@ const FIREBASE_PROJECT_ID = 'hairisland-e6a6f';
 const FIREBASE_API_KEY = 'AIzaSyC2snKdfx82eFdOUxobdSrlqZHm1LpLU9k';
 const FIRESTORE_DOC_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/hairisland/store_data?key=${FIREBASE_API_KEY}`;
 
-// 選填：GAS 網址作為發送 LINE Push 機器人訊息與自動寫入日曆的輔助通道
+// 請確認此處為你 GAS「管理部署作業」中的最新網頁應用程式網址
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwWZ8-2wsQKYF7ujbs1Kga2zMVzz4vLLCcyat0MYmLETc5LJKVIbhulF-6wBpLFjyvU/exec';
 
 // 營業時段：11:00 至 19:00
@@ -182,7 +182,7 @@ export default function App() {
     }
   };
 
-  // ==================== LINE 整合 API 邏輯函式 ====================
+  // ==================== LINE 與 Google 日曆連動 API ====================
   const initLiff = async () => {
     try {
       if (!window.liff) {
@@ -247,7 +247,22 @@ export default function App() {
         body: JSON.stringify({
           action: 'sendBookingConfirmedMsg',
           appointment,
-          serviceName: serviceObj ? serviceObj.name : '專屬美髮服務'
+          serviceName: serviceObj ? serviceObj.name : appointment.serviceName || '專屬美髮服務'
+        })
+      });
+    } catch (e) {}
+  };
+
+  // 取消預約時同步通知 GAS 刪除 Google 日曆行程並發送 LINE 取消通知
+  const sendBookingCancelledMsg = async (appointment, serviceObj) => {
+    try {
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify({
+          action: 'cancelBooking',
+          appointment,
+          serviceName: serviceObj ? serviceObj.name : appointment.serviceName || '專屬美髮服務'
         })
       });
     } catch (e) {}
@@ -261,7 +276,7 @@ export default function App() {
         body: JSON.stringify({
           action: 'sendReminderMsg',
           appointment,
-          serviceName: serviceObj ? serviceObj.name : '專屬美髮服務'
+          serviceName: serviceObj ? serviceObj.name : appointment.serviceName || '專屬美髮服務'
         })
       });
       alert(`✅ 已發送明日預約提醒通知！`);
@@ -466,7 +481,34 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // ==================== 後台管理操作邏輯 ====================
+  // ==================== 後台管理操作邏輯（支援取消時同步釋出日曆與刪除 Google 日曆） ====================
+  // 輔助函式：當某筆訂單取消或刪除時，計算該日期應該釋出的時段（同時保留同日其他有效訂單占用的時段）
+  const releaseSlotsForAppointment = (targetApt, nextAppointmentsList, currentAvl) => {
+    const srv = services.find((s) => s.id === targetApt.serviceId);
+    const dur = srv ? srv.duration : 60;
+    const targetSlots = getOccupiedSlots(targetApt.time, dur);
+
+    // 找出同一天其他「仍有效 (confirmed / pending)」訂單占用的時段，避免誤刪
+    const otherActiveSlots = new Set();
+    nextAppointmentsList.forEach((item) => {
+      if (item.id !== targetApt.id && item.date === targetApt.date && (item.status === 'confirmed' || item.status === 'pending')) {
+        const s = services.find((srvItem) => srvItem.id === item.serviceId);
+        const d = s ? s.duration : 60;
+        getOccupiedSlots(item.time, d).forEach((slot) => otherActiveSlots.add(slot));
+      }
+    });
+
+    const prevBlocked = currentAvl[targetApt.date] || [];
+    const updatedBlocked = prevBlocked.filter(
+      (slot) => !targetSlots.includes(slot) || otherActiveSlots.has(slot)
+    );
+
+    return {
+      ...currentAvl,
+      [targetApt.date]: updatedBlocked
+    };
+  };
+
   const handleConfirmAppointment = async (apt) => {
     const srv = services.find((s) => s.id === apt.serviceId);
     const dur = srv ? srv.duration : 60;
@@ -488,33 +530,47 @@ export default function App() {
 
     await saveToFirebase(services, nextAppointments, nextAvailability);
     await sendBookingConfirmedMsg({ ...apt, status: 'confirmed' }, srv);
-    alert(`✅ 已確認「${apt.customerName}」的預約，並於雲端日曆鎖定該時段！`);
+    alert(`✅ 已確認「${apt.customerName}」的預約，並同步寫入日曆與鎖定該時段！`);
   };
 
   const handleChangeAppointmentStatus = async (apt, newStatus) => {
     const srv = services.find((s) => s.id === apt.serviceId);
-    const dur = srv ? srv.duration : 60;
-    const occupiedSlots = getOccupiedSlots(apt.time, dur);
 
     const nextAppointments = appointments.map((item) =>
       item.id === apt.id ? { ...item, status: newStatus } : item
     );
 
     let nextAvailability = { ...availability };
-    if (newStatus === 'cancelled' && apt.status === 'confirmed') {
-      const prevBlocked = availability[apt.date] || [];
-      nextAvailability[apt.date] = prevBlocked.filter((s) => !occupiedSlots.includes(s));
+
+    // 不論原本是 pending 或 confirmed，只要改為 cancelled，就同步釋出日曆時段並刪除 Google 日曆行程
+    if (newStatus === 'cancelled') {
+      nextAvailability = releaseSlotsForAppointment(apt, nextAppointments, availability);
     }
 
     setAppointments(nextAppointments);
     setAvailability(nextAvailability);
     await saveToFirebase(services, nextAppointments, nextAvailability);
+
+    if (newStatus === 'cancelled') {
+      await sendBookingCancelledMsg({ ...apt, status: 'cancelled' }, srv);
+      alert(`🌿 已取消「${apt.customerName}」的預約，網頁時段已釋出，並同步從 Google 日曆移除該行程！`);
+    }
   };
 
   const handleDeleteAppointment = async (id) => {
+    const targetApt = appointments.find((item) => item.id === id);
     const nextAppointments = appointments.filter((item) => item.id !== id);
+    let nextAvailability = { ...availability };
+
+    if (targetApt) {
+      nextAvailability = releaseSlotsForAppointment(targetApt, nextAppointments, availability);
+      const srv = services.find((s) => s.id === targetApt.serviceId);
+      sendBookingCancelledMsg(targetApt, srv);
+    }
+
     setAppointments(nextAppointments);
-    await saveToFirebase(services, nextAppointments, availability);
+    setAvailability(nextAvailability);
+    await saveToFirebase(services, nextAppointments, nextAvailability);
   };
 
   const handleToggleBlockedSlot = async (dateStr, slot) => {
@@ -675,7 +731,7 @@ export default function App() {
                     : 'text-[#5C4938]'
                 }`}
               >
-                後台 ({sortedAppointments.length})
+                後台 ({sortedAppointments.filter((a) => a.status !== 'cancelled').length})
               </button>
             )}
           </div>
@@ -1075,7 +1131,7 @@ export default function App() {
                   adminTab === 'appointments' ? 'bg-[#3A2E26] text-white shadow-sm' : 'text-[#5C4938]'
                 }`}
               >
-                1. 月曆訂單 ({sortedAppointments.length})
+                1. 月曆訂單 ({sortedAppointments.filter((a) => a.status !== 'cancelled').length})
               </button>
               <button
                 type="button"
@@ -1198,7 +1254,6 @@ export default function App() {
                         >
                           <span className="text-sm font-semibold leading-none">{item.day}</span>
 
-                          {/* 訂單數量或店休徽章 */}
                           {item.totalCount > 0 ? (
                             <span
                               className={`mt-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
@@ -1341,22 +1396,26 @@ export default function App() {
                                 </button>
                               )}
 
-                              <a
-                                href={createGoogleCalendarUrl(apt, srvName)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="py-2 px-3 rounded-lg bg-[#4F775E] text-white font-semibold text-center"
-                              >
-                                📅 加日曆
-                              </a>
+                              {apt.status !== 'cancelled' && (
+                                <a
+                                  href={createGoogleCalendarUrl(apt, srvName)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="py-2 px-3 rounded-lg bg-[#4F775E] text-white font-semibold text-center"
+                                >
+                                  📅 加日曆
+                                </a>
+                              )}
 
-                              <button
-                                type="button"
-                                onClick={() => sendReminderMsg(apt, srv)}
-                                className="py-2 px-3 rounded-lg bg-[#8C6D53] text-white font-semibold"
-                              >
-                                🔔 提醒
-                              </button>
+                              {apt.status !== 'cancelled' && (
+                                <button
+                                  type="button"
+                                  onClick={() => sendReminderMsg(apt, srv)}
+                                  className="py-2 px-3 rounded-lg bg-[#8C6D53] text-white font-semibold"
+                                >
+                                  🔔 提醒
+                                </button>
+                              )}
 
                               {apt.status !== 'cancelled' ? (
                                 <button
