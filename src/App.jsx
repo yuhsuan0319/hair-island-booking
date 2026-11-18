@@ -9,7 +9,7 @@ const FIREBASE_PROJECT_ID = 'hairisland-e6a6f';
 const FIREBASE_API_KEY = 'AIzaSyC2snKdfx82eFdOUxobdSrlqZHm1LpLU9k';
 const FIRESTORE_DOC_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/hairisland/store_data?key=${FIREBASE_API_KEY}`;
 
-// 選填：保留原本的 GAS 網址僅作為發送 LINE Push 機器人訊息的輔助通道
+// 選填：GAS 網址作為發送 LINE Push 機器人訊息與自動寫入日曆的輔助通道
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwWZ8-2wsQKYF7ujbs1Kga2zMVzz4vLLCcyat0MYmLETc5LJKVIbhulF-6wBpLFjyvU/exec';
 
 // 營業時段：11:00 至 19:00
@@ -50,7 +50,26 @@ const getOccupiedSlots = (startTime, duration) => {
   return slots;
 };
 
+// 產生一鍵加入 Google 日曆的專屬網址
+const createGoogleCalendarUrl = (apt, serviceName) => {
+  const formatDT = (dateStr, timeStr) => `${dateStr.replace(/-/g, '')}T${timeStr.replace(/:/g, '')}00`;
+  const dates = `${formatDT(apt.date, apt.time)}/${formatDT(apt.date, apt.endTime)}`;
+  const title = encodeURIComponent(`【髮嶼】${apt.customerName} - ${serviceName}`);
+  const details = encodeURIComponent(
+    `👤 客戶姓名：${apt.customerName}\n📞 聯絡電話：${apt.phone}\n💇 預約服務：${serviceName}\n💬 備註事項：${apt.remark || '無'}`
+  );
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&ctz=Asia/Taipei`;
+};
+
 export default function App() {
+  const todayObj = new Date();
+  const todayStr = useMemo(() => {
+    const y = todayObj.getFullYear();
+    const m = String(todayObj.getMonth() + 1).padStart(2, '0');
+    const d = String(todayObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }, []);
+
   const [currentView, setCurrentView] = useState('customer');
   const [adminTab, setAdminTab] = useState('appointments');
 
@@ -74,26 +93,26 @@ export default function App() {
   const [remark, setRemark] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const todayObj = new Date();
+  // 客戶端月曆狀態
   const [calYear, setCalYear] = useState(todayObj.getFullYear());
   const [calMonth, setCalMonth] = useState(todayObj.getMonth());
 
-  const [scheduleDate, setScheduleDate] = useState(() => {
-    const y = todayObj.getFullYear();
-    const m = String(todayObj.getMonth() + 1).padStart(2, '0');
-    const d = String(todayObj.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  });
+  // 後台訂單月曆狀態 (Tab 1)
+  const [adminCalYear, setAdminCalYear] = useState(todayObj.getFullYear());
+  const [adminCalMonth, setAdminCalMonth] = useState(todayObj.getMonth());
+  const [adminSelectedDate, setAdminSelectedDate] = useState(todayStr);
+  const [showAllAdminOrders, setShowAllAdminOrders] = useState(false);
+
+  // 後台時段管理與服務設定狀態 (Tab 2 & Tab 3)
+  const [scheduleDate, setScheduleDate] = useState(todayStr);
   const [editingService, setEditingService] = useState({ id: '', name: '', price: '', duration: 60 });
 
   // ==================== Firebase Firestore 直連讀寫核心 ====================
-  // 1. 從 Firebase 讀取最新雲端資料
   const fetchFromFirebase = useCallback(async () => {
     setIsSyncing(true);
     try {
       const res = await fetch(`${FIRESTORE_DOC_URL}&t=${Date.now()}`);
       if (res.status === 404) {
-        // 首次使用尚未建立文件，自動初始化
         setDbError('');
         setIsSyncing(false);
         return null;
@@ -133,7 +152,6 @@ export default function App() {
     return null;
   }, []);
 
-  // 2. 將資料寫入 Firebase Firestore
   const saveToFirebase = async (nextServices, nextAppointments, nextAvailability) => {
     setIsSyncing(true);
     try {
@@ -192,7 +210,6 @@ export default function App() {
     }
   };
 
-  // 客戶端送出預約後發送 LINE 通知
   const sendBookingPendingMsg = async (appointment, serviceObj) => {
     if (window.liff && window.liff.isInClient()) {
       try {
@@ -207,7 +224,6 @@ export default function App() {
       }
     }
 
-    // 同步觸發 GAS 推播（非必要，僅作雙重通知）
     try {
       fetch(GAS_URL, {
         method: 'POST',
@@ -254,7 +270,6 @@ export default function App() {
     }
   };
 
-  // 初始化載入 Tailwind、LIFF 與 Firebase 雲端資料（並每 6 秒自動輪詢保持即時更新）
   useEffect(() => {
     if (!document.getElementById('tailwind-cdn')) {
       const script = document.createElement('script');
@@ -311,6 +326,7 @@ export default function App() {
     return DAILY_TIME_SLOTS.some((slot) => isSlotBookable(dateStr, slot, durationMinutes));
   };
 
+  // 客戶端月曆陣列
   const calendarDays = useMemo(() => {
     const firstDay = new Date(calYear, calMonth, 1).getDay();
     const totalDays = new Date(calYear, calMonth + 1, 0).getDate();
@@ -343,12 +359,43 @@ export default function App() {
     return grid;
   }, [calYear, calMonth, selectedService, availability, appointments, services]);
 
+  // 後台訂單月曆陣列（含每日訂單統計徽章）
+  const adminCalendarDays = useMemo(() => {
+    const firstDay = new Date(adminCalYear, adminCalMonth, 1).getDay();
+    const totalDays = new Date(adminCalYear, adminCalMonth + 1, 0).getDate();
+
+    const grid = [];
+    for (let i = 0; i < firstDay; i++) grid.push(null);
+
+    for (let d = 1; d <= totalDays; d++) {
+      const mStr = String(adminCalMonth + 1).padStart(2, '0');
+      const dStr = String(d).padStart(2, '0');
+      const dateStr = `${adminCalYear}-${mStr}-${dStr}`;
+
+      const dayApts = appointments.filter((a) => a.date === dateStr && a.status !== 'cancelled');
+      const pendingCount = dayApts.filter((a) => a.status === 'pending').length;
+      const confirmedCount = dayApts.filter((a) => a.status === 'confirmed' || a.status === 'completed').length;
+      const blockedList = availability[dateStr] || [];
+      const isFullDayClosed = blockedList.length >= DAILY_TIME_SLOTS.length;
+
+      grid.push({
+        day: d,
+        dateStr,
+        totalCount: dayApts.length,
+        pendingCount,
+        confirmedCount,
+        isFullDayClosed
+      });
+    }
+    return grid;
+  }, [adminCalYear, adminCalMonth, appointments, availability]);
+
   const validatePhone = (val) => {
     const clean = val.replace(/[-\s]/g, '');
     return /^09\d{8}$/.test(clean);
   };
 
-  // ==================== 客戶送出預約（直連 Firebase 防撞單） ====================
+  // ==================== 客戶送出預約 ====================
   const handleCreateAppointment = async (e) => {
     e.preventDefault();
     if (!customerName.trim()) {
@@ -368,7 +415,6 @@ export default function App() {
 
     setIsSubmitting(true);
 
-    // 送出前先從 Firebase 抓取最新狀態，避免覆蓋其他客人的訂單並執行 Double Booking 檢核
     const latestCloud = await fetchFromFirebase();
     const currentAptList = latestCloud ? latestCloud.appointments : appointments;
     const currentAvl = latestCloud ? latestCloud.availability : availability;
@@ -410,7 +456,6 @@ export default function App() {
     const nextAppointments = [...currentAptList, newAppointment];
     setAppointments(nextAppointments);
 
-    // 直接寫入 Firebase 雲端資料庫
     await saveToFirebase(currentSrvList, nextAppointments, currentAvl);
     await sendBookingPendingMsg(newAppointment, selectedService);
 
@@ -545,6 +590,7 @@ export default function App() {
     }
   };
 
+  // 所有訂單依日期與時間排序
   const sortedAppointments = useMemo(() => {
     return [...appointments].sort((a, b) => {
       const dtA = `${a.date} ${a.time}`;
@@ -553,6 +599,15 @@ export default function App() {
     });
   }, [appointments]);
 
+  // 後台根據「點選的月曆日期」篩選出的當日訂單（或全部訂單）
+  const filteredAdminAppointments = useMemo(() => {
+    if (showAllAdminOrders || !adminSelectedDate) {
+      return sortedAppointments;
+    }
+    return sortedAppointments.filter((apt) => apt.date === adminSelectedDate);
+  }, [sortedAppointments, adminSelectedDate, showAllAdminOrders]);
+
+  // 客戶個人的訂單
   const customerAppointments = useMemo(() => {
     return sortedAppointments.filter(
       (a) =>
@@ -565,7 +620,6 @@ export default function App() {
     <div className="min-h-screen bg-[#F7F4EF] text-[#2C2520] font-sans pb-16 selection:bg-[#8C6D53] selection:text-white">
       <div className="max-w-md mx-auto px-5 pt-6">
         
-        {/* 若尚未在 Firebase 開啟 Firestore 測試模式，顯示溫馨提醒 */}
         {dbError && isAdmin && (
           <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900">
             ⚠️ {dbError}
@@ -627,7 +681,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* VIEW 1: 客戶端預約介面 */}
+        {/* ==================== VIEW 1: 客戶端預約介面 ==================== */}
         {currentView === 'customer' && (
           <div className="space-y-6">
             <section className="bg-white/80 backdrop-blur rounded-2xl p-6 border border-[#E6DFD5] shadow-sm">
@@ -945,7 +999,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 我的預約訂單 */}
+        {/* ==================== 我的預約訂單 ==================== */}
         {currentView === 'my_bookings' && (
           <div className="bg-white rounded-2xl p-6 border border-[#E6DFD5] shadow-sm space-y-4">
             <div className="flex items-center justify-between">
@@ -964,6 +1018,7 @@ export default function App() {
               <div className="space-y-3">
                 {customerAppointments.map((apt) => {
                   const srv = services.find((s) => s.id === apt.serviceId);
+                  const srvName = srv ? srv.name : apt.serviceName || '美髮服務';
                   const statusBadge = {
                     pending: { label: '待設計師確認', cls: 'bg-amber-100 text-amber-800' },
                     confirmed: { label: '已確認預約', cls: 'bg-emerald-100 text-emerald-800' },
@@ -985,10 +1040,22 @@ export default function App() {
                         </span>
                       </div>
                       <div className="text-[#5C4938] font-medium">
-                        服務項目：{srv ? `${srv.name} ($${srv.price})` : apt.serviceName || '美髮服務'}
+                        服務項目：{srv ? `${srv.name} ($${srv.price})` : srvName}
                       </div>
                       <div className="text-[#7D7168]">預約貴賓：{apt.customerName} ({apt.phone})</div>
                       {apt.remark && <div className="text-[#7D7168]">備註：{apt.remark}</div>}
+                      {apt.status !== 'cancelled' && (
+                        <div className="pt-2">
+                          <a
+                            href={createGoogleCalendarUrl(apt, srvName)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-block px-3 py-1.5 rounded-lg bg-[#E6DFD5] text-[#3A2E26] font-semibold"
+                          >
+                            📅 加入我的 Google 日曆
+                          </a>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -997,7 +1064,7 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 2: 設計師後台管理介面 (Firebase 即時同步) */}
+        {/* ==================== VIEW 2: 設計師後台管理介面 ==================== */}
         {currentView === 'admin' && (
           <div className="space-y-5">
             <div className="grid grid-cols-3 bg-[#EAE3DA] p-1 rounded-xl text-xs font-semibold">
@@ -1008,7 +1075,7 @@ export default function App() {
                   adminTab === 'appointments' ? 'bg-[#3A2E26] text-white shadow-sm' : 'text-[#5C4938]'
                 }`}
               >
-                1. 訂單 ({sortedAppointments.length})
+                1. 月曆訂單 ({sortedAppointments.length})
               </button>
               <button
                 type="button"
@@ -1030,115 +1097,295 @@ export default function App() {
               </button>
             </div>
 
+            {/* ---------- Tab 1: 後台月曆訂單檢視 ---------- */}
             {adminTab === 'appointments' && (
-              <div className="bg-white rounded-2xl p-5 border border-[#E6DFD5] shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-base font-bold text-[#2C2520]">預約訂單管理 (Firebase 雲端)</h2>
-                    <p className="text-[11px] text-[#8C7A6B]">每 6 秒自動同步最新訂單</p>
+              <div className="space-y-4">
+                
+                {/* 上半部：後台互動月曆 */}
+                <div className="bg-white rounded-2xl p-5 border border-[#E6DFD5] shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-base font-bold text-[#2C2520]">選擇日期查看訂單</h2>
+                      <p className="text-[11px] text-[#8C7A6B]">
+                        橘色代表有「待確認」訂單，綠色代表「已確認」
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={fetchFromFirebase}
+                      className="text-xs px-3 py-1.5 rounded-full bg-[#F2ECE4] text-[#5C4938] font-semibold hover:bg-[#E6DFD5]"
+                    >
+                      {isSyncing ? '同步中...' : '🔄 立即刷新'}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={fetchFromFirebase}
-                    className="text-xs px-3 py-1.5 rounded-full bg-[#F2ECE4] text-[#5C4938] font-semibold hover:bg-[#E6DFD5]"
-                  >
-                    {isSyncing ? '同步中...' : '🔄 立即刷新'}
-                  </button>
-                </div>
 
-                {sortedAppointments.length === 0 ? (
-                  <div className="text-center py-10 text-xs text-[#8C7A6B]">目前尚無預約訂單</div>
-                ) : (
-                  <div className="space-y-3">
-                    {sortedAppointments.map((apt) => {
-                      const srv = services.find((s) => s.id === apt.serviceId);
+                  {/* 月份切換列 */}
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (adminCalMonth === 0) {
+                          setAdminCalYear(adminCalYear - 1);
+                          setAdminCalMonth(11);
+                        } else {
+                          setAdminCalMonth(adminCalMonth - 1);
+                        }
+                      }}
+                      className="w-8 h-8 rounded-full border border-[#E6DFD5] flex items-center justify-center text-[#5C4938] hover:bg-[#FAF6F1]"
+                    >
+                      ‹
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-bold tracking-wider text-[#2C2520]">
+                        {adminCalYear} 年 {adminCalMonth + 1} 月
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAdminCalYear(todayObj.getFullYear());
+                          setAdminCalMonth(todayObj.getMonth());
+                          setAdminSelectedDate(todayStr);
+                          setShowAllAdminOrders(false);
+                        }}
+                        className="text-[11px] px-2 py-0.5 rounded bg-[#EAE3DA] text-[#3A2E26] font-semibold"
+                      >
+                        今天
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (adminCalMonth === 11) {
+                          setAdminCalYear(adminCalYear + 1);
+                          setAdminCalMonth(0);
+                        } else {
+                          setAdminCalMonth(adminCalMonth + 1);
+                        }
+                      }}
+                      className="w-8 h-8 rounded-full border border-[#E6DFD5] flex items-center justify-center text-[#5C4938] hover:bg-[#FAF6F1]"
+                    >
+                      ›
+                    </button>
+                  </div>
+
+                  {/* 星期標頭 */}
+                  <div className="grid grid-cols-7 text-center text-xs text-[#8C7A6B] font-medium mb-2">
+                    <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+                  </div>
+
+                  {/* 後台月曆網格 */}
+                  <div className="grid grid-cols-7 gap-1.5 text-center">
+                    {adminCalendarDays.map((item, idx) => {
+                      if (!item) return <div key={`admin-empty-${idx}`} />;
+                      const isSelected = !showAllAdminOrders && adminSelectedDate === item.dateStr;
+                      const isToday = item.dateStr === todayStr;
+
                       return (
-                        <div
-                          key={apt.id}
-                          className="p-4 rounded-xl border border-[#E6DFD5] bg-[#FAF8F5] space-y-2 text-xs"
+                        <button
+                          type="button"
+                          key={item.dateStr}
+                          onClick={() => {
+                            setAdminSelectedDate(item.dateStr);
+                            setShowAllAdminOrders(false);
+                          }}
+                          className={`h-14 rounded-xl flex flex-col items-center justify-center transition-all border relative ${
+                            isSelected
+                              ? 'bg-[#3A2E26] text-white border-[#3A2E26] shadow-sm'
+                              : isToday
+                              ? 'bg-[#FAF6F1] text-[#2C2520] border-[#8C6D53] font-bold'
+                              : 'bg-[#FDFCFB] text-[#2C2520] border-[#E6DFD5] hover:border-[#8C6D53]'
+                          }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-bold text-[#2C2520]">
-                              📅 {apt.date}｜{apt.time} - {apt.endTime}
-                            </span>
+                          <span className="text-sm font-semibold leading-none">{item.day}</span>
+
+                          {/* 訂單數量或店休徽章 */}
+                          {item.totalCount > 0 ? (
                             <span
-                              className={`px-2 py-0.5 rounded font-semibold ${
-                                apt.status === 'pending'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : apt.status === 'confirmed'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : apt.status === 'completed'
-                                  ? 'bg-stone-200 text-stone-700'
-                                  : 'bg-rose-100 text-rose-700'
+                              className={`mt-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                                isSelected
+                                  ? 'bg-white text-[#3A2E26]'
+                                  : item.pendingCount > 0
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  : 'bg-emerald-100 text-emerald-800'
                               }`}
                             >
-                              {apt.status.toUpperCase()}
+                              {item.totalCount} 筆
                             </span>
-                          </div>
-
-                          <div className="text-[#3A2E26] font-semibold">
-                            👤 {apt.customerName}（<a href={`tel:${apt.phone}`} className="underline">{apt.phone}</a>）
-                          </div>
-                          <div className="text-[#5C4938]">
-                            💇 服務：{srv ? `${srv.name} ($${srv.price} / ${srv.duration}分)` : apt.serviceName || apt.serviceId}
-                          </div>
-                          {apt.remark && <div className="text-[#7D7168]">💬 備註：{apt.remark}</div>}
-
-                          <div className="pt-2 flex flex-wrap gap-2 border-t border-[#EAE3DA]">
-                            {apt.status === 'pending' && (
-                              <button
-                                type="button"
-                                onClick={() => handleConfirmAppointment(apt)}
-                                className="flex-1 py-2 px-3 rounded-lg bg-[#3A2E26] text-white font-semibold hover:bg-[#2C2520]"
-                              >
-                                ✓ 確認預約 (鎖定日曆)
-                              </button>
-                            )}
-
-                            {apt.status === 'confirmed' && (
-                              <button
-                                type="button"
-                                onClick={() => handleChangeAppointmentStatus(apt, 'completed')}
-                                className="py-2 px-3 rounded-lg bg-stone-600 text-white font-semibold"
-                              >
-                                標記完成
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => sendReminderMsg(apt, srv)}
-                              className="py-2 px-3 rounded-lg bg-[#8C6D53] text-white font-semibold"
+                          ) : item.isFullDayClosed ? (
+                            <span
+                              className={`mt-1 text-[9px] font-medium ${
+                                isSelected ? 'text-rose-200' : 'text-[#A66A6A]'
+                              }`}
                             >
-                              🔔 提醒
-                            </button>
-
-                            {apt.status !== 'cancelled' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleChangeAppointmentStatus(apt, 'cancelled')}
-                                className="py-2 px-3 rounded-lg bg-rose-100 text-rose-700 font-semibold"
-                              >
-                                取消
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteAppointment(apt.id)}
-                                className="py-2 px-3 rounded-lg bg-gray-200 text-gray-600 font-semibold"
-                              >
-                                刪除紀錄
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                              店休
+                            </span>
+                          ) : (
+                            <span className="mt-1 text-[9px] text-transparent select-none">-</span>
+                          )}
+                        </button>
                       );
                     })}
                   </div>
-                )}
+                </div>
+
+                {/* 下半部：當日訂單列表 */}
+                <div className="bg-white rounded-2xl p-5 border border-[#E6DFD5] shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-[#2C2520]">
+                        {showAllAdminOrders
+                          ? `全部預約訂單 (${filteredAdminAppointments.length})`
+                          : `📅 ${adminSelectedDate} 訂單 (${filteredAdminAppointments.length})`}
+                      </h3>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {!showAllAdminOrders && adminSelectedDate && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setScheduleDate(adminSelectedDate);
+                            setAdminTab('schedule');
+                          }}
+                          className="text-[11px] px-2.5 py-1 rounded-lg bg-[#FAF6F1] border border-[#E6DFD5] text-[#5C4938] font-semibold"
+                        >
+                          ⚙️ 管時段
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowAllAdminOrders(!showAllAdminOrders)}
+                        className="text-[11px] px-2.5 py-1 rounded-lg bg-[#EAE3DA] text-[#3A2E26] font-semibold"
+                      >
+                        {showAllAdminOrders ? '只看選取日' : '顯示全部'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {filteredAdminAppointments.length === 0 ? (
+                    <div className="text-center py-10 bg-[#FAF8F5] rounded-xl border border-[#EFE9E0] text-xs text-[#8C7A6B]">
+                      {showAllAdminOrders
+                        ? '目前尚無任何預約訂單'
+                        : `${adminSelectedDate} 當日尚無預約訂單`}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredAdminAppointments.map((apt) => {
+                        const srv = services.find((s) => s.id === apt.serviceId);
+                        const srvName = srv ? srv.name : apt.serviceName || apt.serviceId;
+                        return (
+                          <div
+                            key={apt.id}
+                            className="p-4 rounded-xl border border-[#E6DFD5] bg-[#FAF8F5] space-y-2 text-xs"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-bold text-[#2C2520]">
+                                ⏰ {apt.time} - {apt.endTime}
+                                {showAllAdminOrders && (
+                                  <span className="ml-2 text-xs font-normal text-[#7D7168]">
+                                    ({apt.date})
+                                  </span>
+                                )}
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 rounded font-semibold ${
+                                  apt.status === 'pending'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : apt.status === 'confirmed'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : apt.status === 'completed'
+                                    ? 'bg-stone-200 text-stone-700'
+                                    : 'bg-rose-100 text-rose-700'
+                                }`}
+                              >
+                                {apt.status === 'pending'
+                                  ? '待確認'
+                                  : apt.status === 'confirmed'
+                                  ? '已確認'
+                                  : apt.status === 'completed'
+                                  ? '已完成'
+                                  : '已取消'}
+                              </span>
+                            </div>
+
+                            <div className="text-[#3A2E26] font-semibold">
+                              👤 {apt.customerName}（
+                              <a href={`tel:${apt.phone}`} className="underline">
+                                {apt.phone}
+                              </a>
+                              ）
+                            </div>
+                            <div className="text-[#5C4938]">
+                              💇 服務：{srv ? `${srv.name} ($${srv.price} / ${srv.duration}分)` : srvName}
+                            </div>
+                            {apt.remark && <div className="text-[#7D7168]">💬 備註：{apt.remark}</div>}
+
+                            <div className="pt-2 flex flex-wrap gap-2 border-t border-[#EAE3DA]">
+                              {apt.status === 'pending' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleConfirmAppointment(apt)}
+                                  className="flex-1 py-2 px-3 rounded-lg bg-[#3A2E26] text-white font-semibold hover:bg-[#2C2520]"
+                                >
+                                  ✓ 確認預約 (鎖定日曆)
+                                </button>
+                              )}
+
+                              {apt.status === 'confirmed' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleChangeAppointmentStatus(apt, 'completed')}
+                                  className="py-2 px-3 rounded-lg bg-stone-600 text-white font-semibold"
+                                >
+                                  標記完成
+                                </button>
+                              )}
+
+                              <a
+                                href={createGoogleCalendarUrl(apt, srvName)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="py-2 px-3 rounded-lg bg-[#4F775E] text-white font-semibold text-center"
+                              >
+                                📅 加日曆
+                              </a>
+
+                              <button
+                                type="button"
+                                onClick={() => sendReminderMsg(apt, srv)}
+                                className="py-2 px-3 rounded-lg bg-[#8C6D53] text-white font-semibold"
+                              >
+                                🔔 提醒
+                              </button>
+
+                              {apt.status !== 'cancelled' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleChangeAppointmentStatus(apt, 'cancelled')}
+                                  className="py-2 px-3 rounded-lg bg-rose-100 text-rose-700 font-semibold"
+                                >
+                                  取消
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAppointment(apt.id)}
+                                  className="py-2 px-3 rounded-lg bg-gray-200 text-gray-600 font-semibold"
+                                >
+                                  刪除紀錄
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
+            {/* ---------- Tab 2: 行事曆與時段管理 ---------- */}
             {adminTab === 'schedule' && (
               <div className="bg-white rounded-2xl p-5 border border-[#E6DFD5] shadow-sm space-y-4">
                 <div>
@@ -1187,6 +1434,7 @@ export default function App() {
               </div>
             )}
 
+            {/* ---------- Tab 3: 服務品項設定 ---------- */}
             {adminTab === 'services' && (
               <div className="bg-white rounded-2xl p-5 border border-[#E6DFD5] shadow-sm space-y-5">
                 <h2 className="text-base font-bold text-[#2C2520]">服務品項、價格與時長設定</h2>
